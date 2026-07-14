@@ -1,0 +1,58 @@
+{
+  "name": "unofficial-substack-sdk",
+  "version": "0.1.0",
+  "description": "Unofficial, portable TypeScript SDK for Substack's web API",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "substack",
+    "substack-api",
+    "substack-sdk",
+    "unofficial",
+    "typescript",
+    "api-client"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cucoleadan/substack-edge-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cucoleadan/substack-edge-sdk/issues"
+  },
+  "homepage": "https://github.com/cucoleadan/substack-edge-sdk#readme",
+  "packageManager": "bun@1.2.19",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "bun run scripts/clean-dist.ts && bun build ./src/index.ts --outdir ./dist --target node --format esm --minify && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "test:all": "bun run typecheck && bun run test",
+    "pack": "bun run build && bun pm pack",
+    "prepublishOnly": "bun run test:all && bun run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "typescript": "^7.0.2"
+  }
+}

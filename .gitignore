@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Local secrets and environment overrides
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.env
+.env.*
+!.env.example
+
+# Build, test, and TypeScript output
+dist/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+
+# Logs
+*.log
+bun-error.log
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

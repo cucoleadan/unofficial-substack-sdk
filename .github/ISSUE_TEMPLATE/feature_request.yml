@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest an improvement or observed Substack endpoint.
+title: "feature: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Explain the user need first.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Endpoint evidence, if applicable
+      description: Link public documentation or provide a redacted, reproducible observation. Never include credentials.
