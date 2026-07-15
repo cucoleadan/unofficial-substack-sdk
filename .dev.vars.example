@@ -7,6 +7,5 @@ SUBSTACK_SESSION_TOKEN=replace-with-your-session-token
 # Required for publication-scoped methods, such as getNotes and publishNote.
 SUBSTACK_PUBLICATION_URL=https://your-publication.substack.com
 
-# Optional overrides.
-SUBSTACK_BASE_URL=https://substack.com
-SUBSTACK_SESSION_COOKIE_NAME=substack.sid
+# The SDK sends the session cookie to the configured HTTPS publication URL.
+# Use only your trusted Substack publication URL or custom domain—never a gateway.

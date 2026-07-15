@@ -18,6 +18,12 @@ describe('apiBase', () => {
     expect(() => apiBase('')).toThrow(SubstackConfigurationError)
     expect(() => apiBase('https://substack.com', '/')).toThrow(SubstackConfigurationError)
   })
+
+  test('accepts HTTPS custom publication origins and rejects insecure ones', () => {
+    expect(apiBase('https://newsletter.example.com')).toBe('https://newsletter.example.com/api/v1/')
+    expect(apiBase('https://newsletter.example.com:8443')).toBe('https://newsletter.example.com:8443/api/v1/')
+    expect(() => apiBase('http://substack.com')).toThrow(SubstackConfigurationError)
+  })
 })
 
 describe('SubstackClient', () => {
@@ -35,6 +41,24 @@ describe('SubstackClient', () => {
 
     expect(request?.url).toBe('https://substack.com/api/v1/posts/by-id/123')
     expect(request?.headers.get('accept')).toBe('application/json')
+    expect(request?.headers.get('cookie')).toBe('substack.sid=session-value')
+    expect(request?.redirect).toBe('error')
+  })
+
+  test('uses a supplied custom domain for publication-scoped requests', async () => {
+    let request: Request | undefined
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://newsletter.example.com',
+      fetch: async (input, init) => {
+        request = new Request(input, init)
+        return Response.json({ items: [] })
+      }
+    })
+
+    await client.getNotes()
+
+    expect(request?.url).toBe('https://newsletter.example.com/api/v1/notes')
     expect(request?.headers.get('cookie')).toBe('substack.sid=session-value')
   })
 

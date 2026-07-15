@@ -9,9 +9,16 @@ export interface SubstackClientOptions {
   sessionToken?: string
   /** Legacy alias for sessionToken. */
   token?: string
-  /** Publication origin used by publication-scoped endpoints. */
+  /**
+   * HTTPS publication origin used by publication-scoped endpoints. Custom
+   * domains are supported; callers must ensure the domain is trusted because
+   * it receives the authenticated session cookie.
+   */
   publicationUrl?: string
-  /** Global Substack origin. Defaults to https://substack.com. */
+  /**
+   * Global Substack origin. Defaults to https://substack.com. It must use
+   * HTTPS; overriding it sends the authenticated session cookie to that origin.
+   */
   baseUrl?: string
   /** Legacy alias for baseUrl. */
   substackUrl?: string

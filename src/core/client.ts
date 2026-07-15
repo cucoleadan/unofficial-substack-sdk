@@ -45,16 +45,29 @@ function normalizeOrigin(value: string): URL {
     throw new SubstackConfigurationError('A Substack base URL cannot be empty.')
   }
 
+  let url: URL
   try {
-    return new URL(trimmed)
+    url = new URL(trimmed)
   } catch {
-    return new URL(`https://${trimmed}`)
+    try {
+      url = new URL(`https://${trimmed}`)
+    } catch {
+      throw new SubstackConfigurationError('A valid Substack HTTPS URL is required.')
+    }
   }
+
+  if (url.protocol !== 'https:') {
+    throw new SubstackConfigurationError('A Substack API URL must use HTTPS.')
+  }
+
+  return url
 }
 
 /**
- * Normalizes a Substack origin into an API base. Query strings and fragments
- * from copied browser URLs are intentionally discarded.
+ * Normalizes an HTTPS Substack or custom-publication origin into an API base.
+ * Query strings and fragments from copied browser URLs are intentionally
+ * discarded. The caller is responsible for trusting custom origins because the
+ * session cookie is sent to the configured publication URL.
  */
 export function apiBase(value: string, prefix = DEFAULT_API_PREFIX): string {
   const url = normalizeOrigin(value)
@@ -244,8 +257,8 @@ export class SubstackClient {
     // Do not store native fetch as an instance method: platform fetch
     // implementations require their global receiver.
     const response = this.fetchImpl
-      ? await this.fetchImpl(url, { ...init, headers })
-      : await globalThis.fetch(url, { ...init, headers })
+      ? await this.fetchImpl(url, { ...init, headers, redirect: 'error' })
+      : await globalThis.fetch(url, { ...init, headers, redirect: 'error' })
     const body = await response.text()
 
     if (!response.ok) {
