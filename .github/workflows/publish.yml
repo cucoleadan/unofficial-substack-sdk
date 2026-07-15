@@ -30,5 +30,33 @@ jobs:
         run: bun run build
       - name: Verify npm artifact
         run: bun pm pack --dry-run
+      - name: Verify release version
+        id: release_version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          package_version="$(node --input-type=commonjs -p "require('./package.json').version")"
+          expected_tag="v$package_version"
+          if [ "$RELEASE_TAG" != "$expected_tag" ]; then
+            echo "::error::Release tag $RELEASE_TAG must match package version $expected_tag."
+            exit 1
+          fi
+          echo "package_version=$package_version" >> "$GITHUB_OUTPUT"
+      - name: Check npm publication
+        id: npm_version
+        env:
+          PACKAGE_VERSION: ${{ steps.release_version.outputs.package_version }}
+        run: |
+          published_version="$(npm view "unofficial-substack-sdk@$PACKAGE_VERSION" version --registry=https://registry.npmjs.org 2>/dev/null || true)"
+          if [ "$published_version" = "$PACKAGE_VERSION" ]; then
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+            echo "unofficial-substack-sdk@$PACKAGE_VERSION is already published; skipping npm publish."
+          else
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Publish with provenance
+        if: steps.npm_version.outputs.already_published != 'true'
         run: npm publish --provenance --access public
+      - name: Report existing npm version
+        if: steps.npm_version.outputs.already_published == 'true'
+        run: echo "The release version is already on npm; no duplicate publish was attempted."
