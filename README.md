@@ -98,7 +98,9 @@ bun run pack
 
 The publish workflow runs only when a GitHub Release is published. It uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) through GitHub Actions OIDC, so no `NPM_TOKEN` secret or npm GitHub environment is required.
 
-Before publishing the first release, add a GitHub Actions trusted publisher for `unofficial-substack-sdk` in npm, allowing `npm publish` from `cucoleadan/unofficial-substack-sdk` and `.github/workflows/publish.yml`. This requires an npm account with permission to publish the package. The workflow runs the full validation suite and publishes the public package with provenance.
+For a brand-new npm package, publish the initial version manually after validation. Then add a GitHub Actions trusted publisher for `unofficial-substack-sdk` in npm, allowing `npm publish` from `cucoleadan/unofficial-substack-sdk` and `.github/workflows/publish.yml`. This requires an npm account with permission to publish the package. Subsequent GitHub Releases run the full validation suite and publish with provenance.
+
+The release tag must match the package version (for example, `v0.1.1` for `0.1.1`). If that exact version is already on npm, the workflow validates the release and skips the duplicate publish rather than failing.
 
 ## Security
 
