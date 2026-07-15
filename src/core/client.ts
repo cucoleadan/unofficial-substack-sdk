@@ -1,16 +1,39 @@
 import { SubstackApiError, SubstackConfigurationError } from './errors.js'
-import {
-  ACTIVITY_FILTERS,
-  type ActivityFeed,
-  type ActivityFilter,
-  type CreateAttachmentRequest,
-  type CursorOptions,
-  type FetchLike,
-  type PublishNoteRequest,
-  type ProfilePostsOptions,
-  type SubstackClientOptions,
-  type UnreadActivityFeed
+import type { EndpointContext } from './transport.js'
+import type {
+  ActivityFeed,
+  ActivityFilter,
+  CreateAttachmentRequest,
+  CursorOptions,
+  EmailStatsOptions,
+  EmailStatsPage,
+  FetchLike,
+  PublishNoteRequest,
+  ProfilePostsOptions,
+  SubstackClientOptions,
+  SubscriberStatsResponse,
+  UnreadActivityFeed
 } from './types.js'
+import { getActivity, getUnreadActivity } from '../resources/activity/index.js'
+import { getAllEmailStats, getEmailStats } from '../resources/email-stats/index.js'
+import {
+  createAttachment,
+  getComment,
+  getNote,
+  getNotes,
+  getPostComments,
+  getProfileNotes,
+  publishNote
+} from '../resources/notes/index.js'
+import { getPost } from '../resources/posts/index.js'
+import {
+  getAuthenticatedProfile,
+  getFollowing,
+  getProfileById,
+  getProfilePosts,
+  getPublicProfile
+} from '../resources/profiles/index.js'
+import { getSubscriberStats } from '../resources/subscriber-stats/index.js'
 
 const DEFAULT_BASE_URL = 'https://substack.com'
 const DEFAULT_SESSION_COOKIE_NAME = 'substack.sid'
@@ -47,28 +70,6 @@ export function apiBase(value: string, prefix = DEFAULT_API_PREFIX): string {
   return url.toString()
 }
 
-function isActivityFilter(value: string): value is ActivityFilter {
-  return (ACTIVITY_FILTERS as readonly string[]).includes(value)
-}
-
-function positiveInteger(value: number | string, name: string): number {
-  const parsed = typeof value === 'number' ? value : Number(value)
-  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
-    throw new SubstackConfigurationError(`${name} must be a positive integer.`)
-  }
-  return parsed
-}
-
-function cursorQuery(options?: CursorOptions): string {
-  return options?.cursor ? `?cursor=${encodeURIComponent(options.cursor)}` : ''
-}
-
-type ProfileFeedItem = {
-  context?: {
-    users?: Array<{ id?: number | string; handle?: string }>
-  }
-}
-
 /**
  * Portable, Web-standard client for the observed Substack web API.
  *
@@ -80,6 +81,7 @@ export class SubstackClient {
   private readonly globalApiBase: string
   private readonly publicationApiBase?: string
   private readonly sessionCookie: string
+  private readonly endpoints: EndpointContext
 
   constructor(options: SubstackClientOptions) {
     const sessionToken = options.sessionToken ?? options.token
@@ -93,75 +95,77 @@ export class SubstackClient {
       ? apiBase(options.publicationUrl, options.urlPrefix)
       : undefined
     this.sessionCookie = `${options.sessionCookieName ?? DEFAULT_SESSION_COOKIE_NAME}=${sessionToken}`
+    this.endpoints = {
+      global: <T = unknown>(path: string) => this.global<T>(path),
+      publication: <T = unknown>(path: string) => this.publication<T>(path),
+      post: <T = unknown>(path: string, body: unknown) => this.post<T>(path, body),
+      put: <T = unknown>(path: string, body: unknown) => this.put<T>(path, body)
+    }
   }
 
-  async getAuthenticatedProfile(): Promise<unknown> {
-    const handles = await this.global<{ potentialHandles?: Array<{ handle: string; type: string }> }>(
-      '/handle/options'
-    )
-    const ownHandle = handles.potentialHandles?.find((handle) => handle.type === 'existing')?.handle
-
-    if (!ownHandle) {
-      throw new SubstackApiError('Authenticated Substack profile was not found.', 502, '/handle/options')
-    }
-
-    return this.getPublicProfile(ownHandle)
+  getAuthenticatedProfile(): Promise<unknown> {
+    return getAuthenticatedProfile(this.endpoints)
   }
 
   getPublicProfile(handle: string): Promise<unknown> {
-    const normalizedHandle = handle.trim()
-    if (!normalizedHandle) {
-      throw new SubstackConfigurationError('A profile handle is required.')
-    }
-    return this.global(`/user/${encodeURIComponent(normalizedHandle)}/public_profile`)
+    return getPublicProfile(this.endpoints, handle)
   }
 
-  async getProfileById(id: number | string): Promise<unknown> {
-    const profileId = positiveInteger(id, 'Profile ID')
-    const feed = await this.global<{ items?: ProfileFeedItem[] }>(`/reader/feed/profile/${profileId}`)
-    const user = feed.items
-      ?.flatMap((item) => item.context?.users ?? [])
-      .find((candidate) => Number(candidate.id) === profileId && typeof candidate.handle === 'string')
-
-    if (!user?.handle) {
-      throw new SubstackApiError(`Profile with ID ${profileId} was not found.`, 404, `/reader/feed/profile/${profileId}`)
-    }
-
-    return this.getPublicProfile(user.handle)
+  getProfileById(id: number | string): Promise<unknown> {
+    return getProfileById(this.endpoints, id)
   }
 
   getPost(id: string | number): Promise<unknown> {
-    return this.global(`/posts/by-id/${encodeURIComponent(String(positiveInteger(id, 'Post ID')))}`)
+    return getPost(this.endpoints, id)
   }
 
-  getProfilePosts(id: number | string, _options: ProfilePostsOptions = {}): Promise<unknown> {
-    const profileId = positiveInteger(id, 'Profile ID')
-    return this.global(`/profile/posts?profile_user_id=${profileId}`)
+  getProfilePosts(id: number | string, options: ProfilePostsOptions = {}): Promise<unknown> {
+    return getProfilePosts(this.endpoints, id, options)
   }
 
   getNotes(options: CursorOptions = {}): Promise<unknown> {
-    return this.publication(`/notes${cursorQuery(options)}`)
+    return getNotes(this.endpoints, options)
   }
 
   getProfileNotes(id: number | string, options: CursorOptions = {}): Promise<unknown> {
-    const profileId = positiveInteger(id, 'Profile ID')
-    const query = new URLSearchParams({ types: 'note' })
-    if (options.cursor) {
-      query.set('cursor', options.cursor)
-    }
-    return this.publication(`/reader/feed/profile/${profileId}?${query.toString()}`)
+    return getProfileNotes(this.endpoints, id, options)
   }
 
   getNote(id: number | string): Promise<unknown> {
-    return this.publication(`/reader/comment/${positiveInteger(id, 'Note ID')}`)
+    return getNote(this.endpoints, id)
   }
 
   getComment(id: number | string): Promise<unknown> {
-    return this.publication(`/reader/comment/${positiveInteger(id, 'Comment ID')}`)
+    return getComment(this.endpoints, id)
   }
 
   getPostComments(id: number | string): Promise<unknown> {
-    return this.publication(`/post/${positiveInteger(id, 'Post ID')}/comments`)
+    return getPostComments(this.endpoints, id)
+  }
+
+  /**
+   * Returns email delivery and engagement statistics for this publication's posts.
+   * The response is available only to authenticated publication administrators.
+   */
+  getEmailStats<T = unknown>(options: EmailStatsOptions = {}): Promise<EmailStatsPage<T>> {
+    return getEmailStats(this.endpoints, options)
+  }
+
+  /**
+   * Retrieves every available email-stat row, starting at `options.offset`.
+   * It continues until Substack returns an empty page and returns a flat array
+   * of rows. Use `options.limit` to control the number requested per page.
+   */
+  getAllEmailStats<T = unknown>(options: EmailStatsOptions = {}): Promise<T[]> {
+    return getAllEmailStats(this.endpoints, options)
+  }
+
+  /**
+   * Returns the publication's subscriber records and aggregate subscriber count.
+   * The response may include subscriber personal data, including email addresses.
+   */
+  getSubscriberStats<T = unknown>(): Promise<SubscriberStatsResponse<T>> {
+    return getSubscriberStats(this.endpoints)
   }
 
   /**
@@ -169,7 +173,7 @@ export class SubstackClient {
    * `publishNote` as an `attachmentIds` entry.
    */
   createAttachment(request: CreateAttachmentRequest): Promise<unknown> {
-    return this.post('/comment/attachment/', request)
+    return createAttachment(this.endpoints, request)
   }
 
   /**
@@ -177,49 +181,24 @@ export class SubstackClient {
    * This operation has an irreversible external side effect.
    */
   publishNote(request: PublishNoteRequest): Promise<unknown> {
-    return this.post('/comment/feed/', request)
+    return publishNote(this.endpoints, request)
   }
 
   getActivity(filter: ActivityFilter = 'all'): Promise<ActivityFeed> {
-    return this.global(`/activity-feed-web?filter=${encodeURIComponent(filter)}`)
+    return getActivity(this.endpoints, filter)
   }
 
-  async getUnreadActivity(): Promise<UnreadActivityFeed> {
-    const [unread, feed] = await Promise.all([
-      this.global<{ count?: unknown; max?: unknown; lastViewedAt?: unknown }>('/activity/unread'),
-      this.getActivity('all')
-    ])
-    const unreadCount =
-      typeof unread.count === 'number' && Number.isFinite(unread.count)
-        ? Math.max(0, Math.floor(unread.count))
-        : 0
-
-    return {
-      ...feed,
-      activityItems: Array.isArray(feed.activityItems)
-        ? feed.activityItems.slice(0, unreadCount)
-        : [],
-      unread: {
-        count: unreadCount,
-        max: unread.max,
-        lastViewedAt: unread.lastViewedAt,
-        strategy: 'latest-activity-items'
-      }
-    }
+  getUnreadActivity(): Promise<UnreadActivityFeed> {
+    return getUnreadActivity(this.endpoints)
   }
 
-  async getFollowing(): Promise<unknown> {
-    const settings = await this.put<{ user_id?: unknown }>('/user-setting', {
-      type: 'last_home_tab',
-      value_text: 'inbox'
-    })
-    const userId = positiveInteger(Number(settings.user_id), 'Authenticated user ID')
-    return this.publication(`/user/${userId}/subscriber-lists?lists=following`)
+  getFollowing(): Promise<unknown> {
+    return getFollowing(this.endpoints)
   }
 
   async testConnectivity(): Promise<boolean> {
     try {
-      await this.put('/user-setting', { type: 'last_home_tab', value_text: 'inbox' })
+      await this.endpoints.put('/user-setting', { type: 'last_home_tab', value_text: 'inbox' })
       return true
     } catch {
       return false
@@ -290,4 +269,4 @@ export class SubstackClient {
   }
 }
 
-export { isActivityFilter }
+export { isActivityFilter } from '../resources/activity/index.js'
