@@ -110,11 +110,13 @@ bun run pack
 
 ## Maintainer publishing
 
-The publish workflow runs only when a GitHub Release is published. It uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) through GitHub Actions OIDC, so no `NPM_TOKEN` secret or npm GitHub environment is required.
+The release workflow runs whenever a commit reaches `main`. It reads `package.json`; when that version is not yet on npm, it runs the full validation suite, publishes with provenance, and creates the matching GitHub Release automatically. If the npm version is already published but the GitHub Release is missing, the workflow creates only the missing release. It can also be rerun manually from the Actions tab.
 
-For a brand-new npm package, publish the initial version manually after validation. Then add a GitHub Actions trusted publisher for `unofficial-substack-sdk` in npm, allowing `npm publish` from `cucoleadan/unofficial-substack-sdk` and `.github/workflows/publish.yml`. This requires an npm account with permission to publish the package. Subsequent GitHub Releases run the full validation suite and publish with provenance.
+The workflow uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) through GitHub Actions OIDC, so no `NPM_TOKEN` secret or npm GitHub environment is required.
 
-The release tag must match the package version (for example, `v0.1.1` for `0.1.1`). If that exact version is already on npm, the workflow validates the release and skips the duplicate publish rather than failing.
+For a brand-new npm package, publish the initial version manually after validation. Then add a GitHub Actions trusted publisher for `unofficial-substack-sdk` in npm, allowing `npm publish` from `cucoleadan/unofficial-substack-sdk` and `.github/workflows/publish.yml`. This requires an npm account with permission to publish the package. Subsequent new versions on `main` publish automatically with provenance.
+
+To release a new version, update `package.json` using semantic versioning and merge that change into `main`. The workflow creates the matching tag and release (for example, `v0.1.1` for `0.1.1`). It never republishes an existing npm version.
 
 ## Maintainer pull requests
 
