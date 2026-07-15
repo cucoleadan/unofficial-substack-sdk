@@ -116,6 +116,10 @@ For a brand-new npm package, publish the initial version manually after validati
 
 The release tag must match the package version (for example, `v0.1.1` for `0.1.1`). If that exact version is already on npm, the workflow validates the release and skips the duplicate publish rather than failing.
 
+## Maintainer pull requests
+
+For pull requests into `main` from a branch in this repository, [owner auto-merge](.github/workflows/owner-auto-merge.yml) enables squash auto-merge when the author is `cucoleadan`. It never bypasses the branch rules or CI; GitHub merges only after all requirements pass. Enable **Settings → General → Pull Requests → Allow auto-merge** in the repository for this workflow to work.
+
 ## Security
 
 Never include a Substack session token in a bug report, pull request, log, or test fixture. Please follow [SECURITY.md](SECURITY.md) for responsible vulnerability disclosure.
