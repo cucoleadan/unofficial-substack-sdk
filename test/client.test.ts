@@ -77,6 +77,97 @@ describe('SubstackClient', () => {
     expect(request?.url).toBe('https://allagentsconsidered.substack.com/api/v1/notes?cursor=next%20page')
   })
 
+  test('gets reply and mention activity through the global activity endpoint', async () => {
+    let request: Request | undefined
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async (input, init) => {
+        request = new Request(input, init)
+        return Response.json({ activityItems: [] })
+      }
+    })
+
+    await client.getActivity('replies-and-mentions')
+
+    expect(request?.url).toBe('https://substack.com/api/v1/activity-feed-web?filter=replies-and-mentions')
+  })
+
+  test('gets publication email stats using the dashboard defaults and supplied query options', async () => {
+    const requests: Request[] = []
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://allagentsconsidered.substack.com',
+      fetch: async (input, init) => {
+        const request = new Request(input, init)
+        requests.push(request)
+        return Response.json({ rows: [] })
+      }
+    })
+
+    await client.getEmailStats()
+    await client.getEmailStats({ offset: 20, limit: 50, orderBy: 'opens', orderDirection: 'asc' })
+
+    expect(requests.map((request) => request.url)).toEqual([
+      'https://allagentsconsidered.substack.com/api/v1/publication/stats/email_stats?offset=0&limit=20&order_by=post_date&order_direction=desc',
+      'https://allagentsconsidered.substack.com/api/v1/publication/stats/email_stats?offset=20&limit=50&order_by=opens&order_direction=asc'
+    ])
+  })
+
+  test('validates email stats pagination values', () => {
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://allagentsconsidered.substack.com'
+    })
+
+    expect(() => client.getEmailStats({ offset: -1 })).toThrow(SubstackConfigurationError)
+    expect(() => client.getEmailStats({ limit: 0 })).toThrow(SubstackConfigurationError)
+  })
+
+  test('collects every email stats page into one array', async () => {
+    const requests: string[] = []
+    const pages = new Map([
+      [0, [{ post_id: 1 }, { post_id: 2 }]],
+      [2, [{ post_id: 3 }]],
+      [3, []]
+    ])
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://allagentsconsidered.substack.com',
+      fetch: async (input) => {
+        const url = new URL(new Request(input).url)
+        requests.push(url.toString())
+        return Response.json({ rows: pages.get(Number(url.searchParams.get('offset'))) })
+      }
+    })
+
+    await expect(
+      client.getAllEmailStats<{ post_id: number }>({ limit: 2, orderBy: 'opens', orderDirection: 'asc' })
+    ).resolves.toEqual([{ post_id: 1 }, { post_id: 2 }, { post_id: 3 }])
+    expect(requests).toEqual([
+      'https://allagentsconsidered.substack.com/api/v1/publication/stats/email_stats?offset=0&limit=2&order_by=opens&order_direction=asc',
+      'https://allagentsconsidered.substack.com/api/v1/publication/stats/email_stats?offset=2&limit=2&order_by=opens&order_direction=asc',
+      'https://allagentsconsidered.substack.com/api/v1/publication/stats/email_stats?offset=3&limit=2&order_by=opens&order_direction=asc'
+    ])
+  })
+
+  test('gets subscriber stats from the publication origin', async () => {
+    let request: Request | undefined
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://allagentsconsidered.substack.com',
+      fetch: async (input, init) => {
+        request = new Request(input, init)
+        return Response.json({ subscribers: [{ user_id: 1, user_email_address: 'reader@example.com' }] })
+      }
+    })
+
+    await expect(client.getSubscriberStats<{ user_id: number; user_email_address: string }>()).resolves.toEqual({
+      subscribers: [{ user_id: 1, user_email_address: 'reader@example.com' }]
+    })
+    expect(request?.url).toBe('https://allagentsconsidered.substack.com/api/v1/subscriber-stats')
+    expect(request?.headers.get('cookie')).toBe('substack.sid=session-value')
+  })
+
   test('creates link attachments and publishes Notes through global write endpoints', async () => {
     const calls: Array<{ method: string; url: string; body: unknown }> = []
     const client = new SubstackClient({

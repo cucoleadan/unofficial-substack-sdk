@@ -6,9 +6,12 @@ export {
   type ActivityFilter,
   type CreateAttachmentRequest,
   type CursorOptions,
+  type EmailStatsOptions,
+  type EmailStatsPage,
   type FetchLike,
   type PublishNoteRequest,
   type ProfilePostsOptions,
   type SubstackClientOptions,
+  type SubscriberStatsResponse,
   type UnreadActivityFeed
 } from './types.js'

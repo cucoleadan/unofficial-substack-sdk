@@ -34,6 +34,30 @@ export interface ProfilePostsOptions {
   offset?: number
 }
 
+/** Options for a publication's email performance report. */
+export interface EmailStatsOptions {
+  /** Zero-based row offset. Defaults to 0. */
+  offset?: number
+  /** Number of rows to return. Defaults to 20. */
+  limit?: number
+  /** Upstream email-stat field to sort by. Defaults to `post_date`. */
+  orderBy?: string
+  /** Sort direction. Defaults to `desc`. */
+  orderDirection?: 'asc' | 'desc'
+}
+
+/** An unmodified page from Substack's publication email statistics endpoint. */
+export type EmailStatsPage<T = unknown> = {
+  rows?: T[]
+  [key: string]: unknown
+}
+
+/** An unmodified response from Substack's publication subscriber statistics endpoint. */
+export type SubscriberStatsResponse<T = unknown> = {
+  subscribers?: T[]
+  [key: string]: unknown
+}
+
 /** Payload for Substack's link-attachment endpoint. */
 export interface CreateAttachmentRequest {
   url: string

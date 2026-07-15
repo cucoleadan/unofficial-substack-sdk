@@ -29,7 +29,7 @@ const notes = await client.getNotes()
 
 `sessionToken` is the value of the `substack.sid` cookie only: do not pass `substack.sid=` or a complete `Cookie` header. Store it only in trusted server-side environment variables—never expose it in browser code, client bundles, issues, or logs.
 
-`publicationUrl` is required for publication-scoped methods such as `getNotes`, `getNote`, `getComment`, `getPostComments`, `getProfileNotes`, and `getFollowing`. It accepts a bare host or a copied browser URL; query strings and fragments are discarded safely.
+`publicationUrl` is required for publication-scoped methods such as `getNotes`, `getNote`, `getComment`, `getPostComments`, `getEmailStats`, `getSubscriberStats`, `getProfileNotes`, and `getFollowing`. It accepts a bare host or a copied browser URL; query strings and fragments are discarded safely.
 
 ## Local configuration
 
@@ -46,6 +46,9 @@ Copy [`.dev.vars.example`](.dev.vars.example) to `.dev.vars` and replace the pla
 | `getProfileNotes(id, { cursor })` | Notes feed for a numeric profile ID. |
 | `getPost(id)` | Post by global Substack ID. |
 | `getPostComments(id)` | Comments for a post. |
+| `getEmailStats({ offset, limit, orderBy, orderDirection })` | Publication email delivery and engagement stats. Defaults: `0`, `20`, `post_date`, `desc`. Requires a publication administrator session. |
+| `getAllEmailStats({ offset, limit, orderBy, orderDirection })` | Fetches every email-stat page and returns one flat array of rows. |
+| `getSubscriberStats()` | Publication subscriber records and aggregate count. The response may contain subscriber personal data. |
 | `getNotes({ cursor })` | Authenticated publication Notes feed. |
 | `getNote(id)` | Note by ID. |
 | `getComment(id)` | Comment by ID. |
@@ -57,6 +60,17 @@ Copy [`.dev.vars.example`](.dev.vars.example) to `.dev.vars` and replace the pla
 | `publishNote(request)` | Publishes a Note to the authenticated account's feed. |
 
 The client returns upstream JSON unchanged, except `getUnreadActivity()`, which returns an annotated activity feed. It exports `SubstackApiError`, `SubstackConfigurationError`, `apiBase`, `ACTIVITY_FILTERS`, and its public TypeScript types.
+
+## Replies and mentions
+
+Use `getActivity('replies-and-mentions')` for Substack's authenticated reply-and-mention activity feed (`/api/v1/activity-feed-web?filter=replies-and-mentions`). To show the five most recent activity items:
+
+```ts
+const activity = await client.getActivity('replies-and-mentions')
+const latestFive = (activity.activityItems ?? []).slice(0, 5)
+```
+
+This is an activity feed, so it can include both replies and mentions. To fetch the comments for one particular post, use `getPostComments(postId)`.
 
 ## Publishing Notes
 
