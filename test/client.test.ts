@@ -392,10 +392,8 @@ describe('SubstackClient', () => {
         method: 'POST',
         url: 'https://substack.com/api/v1/comment/attachment',
         body: {
-          type: 'image',
-          imageUrl: uploadedImage.url,
-          imageWidth: 404,
-          imageHeight: 390
+          url: uploadedImage.url,
+          type: 'image'
         }
       }
     ])
