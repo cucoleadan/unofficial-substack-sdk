@@ -18,12 +18,14 @@ import type {
   SubstackClientOptions,
   SubscriberStatsResponse,
   UnreadActivityFeed,
+  UploadedImage,
   UpdateScheduledNoteRequest
 } from './types.js'
 import { getActivity, getUnreadActivity } from '../resources/activity/index.js'
 import { getAllEmailStats, getEmailStats } from '../resources/email-stats/index.js'
 import {
   createAttachment,
+  createImageAttachment,
   deleteNote,
   getComment,
   getDraftNotes,
@@ -33,6 +35,7 @@ import {
   getProfileNotes,
   publishNote,
   scheduleNote,
+  uploadImage,
   updateScheduledNote
 } from '../resources/notes/index.js'
 import { getPost, getPostWithEngagement } from '../resources/posts/index.js'
@@ -224,6 +227,16 @@ export class SubstackClient {
    */
   createAttachment(request: CreateAttachmentRequest): Promise<unknown> {
     return createAttachment(this.endpoints, request)
+  }
+
+  /** Uploads a data-URL image and returns its Substack media metadata. */
+  uploadImage(image: string): Promise<UploadedImage> {
+    return uploadImage(this.endpoints, image)
+  }
+
+  /** Creates a Note image attachment from a previously uploaded image. */
+  createImageAttachment(image: UploadedImage): Promise<unknown> {
+    return createImageAttachment(this.endpoints, image)
   }
 
   /**

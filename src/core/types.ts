@@ -124,9 +124,30 @@ export type SubscriberStatsResponse<T = unknown> = {
 }
 
 /** Payload for Substack's link-attachment endpoint. */
-export interface CreateAttachmentRequest {
+export interface CreateLinkAttachmentRequest {
   url: string
   type: 'link'
+}
+
+/** Payload for attaching an uploaded image to a Note. */
+export interface CreateImageAttachmentRequest {
+  type: 'image'
+  imageUrl: string
+  imageWidth: number
+  imageHeight: number
+}
+
+/** Payload accepted by Substack's Note attachment endpoint. */
+export type CreateAttachmentRequest = CreateLinkAttachmentRequest | CreateImageAttachmentRequest
+
+/** Metadata returned after uploading an image to Substack. */
+export interface UploadedImage {
+  id: number
+  url: string
+  contentType: string
+  bytes: number
+  imageWidth: number
+  imageHeight: number
 }
 
 /**

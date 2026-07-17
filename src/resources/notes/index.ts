@@ -7,6 +7,7 @@ import type {
   DraftNotesPage,
   PublishNoteRequest,
   ScheduleNoteRequest,
+  UploadedImage,
   UpdateScheduledNoteRequest
 } from '../../core/types.js'
 
@@ -58,7 +59,22 @@ export function getPostComments<T = unknown>(context: EndpointContext, id: numbe
 }
 
 export function createAttachment(context: EndpointContext, request: CreateAttachmentRequest): Promise<unknown> {
-  return context.post('/comment/attachment/', request)
+  return context.post('/comment/attachment', request)
+}
+
+/** Uploads a data-URL image and returns its Substack media metadata. */
+export function uploadImage(context: EndpointContext, image: string): Promise<UploadedImage> {
+  return context.post('/image', { image })
+}
+
+/** Creates a Note image attachment from a previously uploaded image. */
+export function createImageAttachment(context: EndpointContext, image: UploadedImage): Promise<unknown> {
+  return createAttachment(context, {
+    type: 'image',
+    imageUrl: image.url,
+    imageWidth: image.imageWidth,
+    imageHeight: image.imageHeight
+  })
 }
 
 export function publishNote(context: EndpointContext, request: PublishNoteRequest): Promise<unknown> {
