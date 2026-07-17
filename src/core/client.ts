@@ -17,12 +17,15 @@ import type {
   ScheduleNoteRequest,
   SubstackClientOptions,
   SubscriberStatsResponse,
-  UnreadActivityFeed
+  UnreadActivityFeed,
+  UploadedImage,
+  UpdateScheduledNoteRequest
 } from './types.js'
 import { getActivity, getUnreadActivity } from '../resources/activity/index.js'
 import { getAllEmailStats, getEmailStats } from '../resources/email-stats/index.js'
 import {
   createAttachment,
+  createImageAttachment,
   deleteNote,
   getComment,
   getDraftNotes,
@@ -31,7 +34,9 @@ import {
   getPostComments,
   getProfileNotes,
   publishNote,
-  scheduleNote
+  scheduleNote,
+  uploadImage,
+  updateScheduledNote
 } from '../resources/notes/index.js'
 import { getPost, getPostWithEngagement } from '../resources/posts/index.js'
 import {
@@ -120,6 +125,7 @@ export class SubstackClient {
       global: <T = unknown>(path: string) => this.global<T>(path),
       publication: <T = unknown>(path: string) => this.publication<T>(path),
       post: <T = unknown>(path: string, body: unknown) => this.post<T>(path, body),
+      patch: <T = unknown>(path: string, body: unknown) => this.patch<T>(path, body),
       put: <T = unknown>(path: string, body: unknown) => this.put<T>(path, body),
       remove: <T = unknown>(path: string) => this.remove<T>(path)
     }
@@ -223,6 +229,16 @@ export class SubstackClient {
     return createAttachment(this.endpoints, request)
   }
 
+  /** Uploads a data-URL image and returns its Substack media metadata. */
+  uploadImage(image: string): Promise<UploadedImage> {
+    return uploadImage(this.endpoints, image)
+  }
+
+  /** Creates a Note image attachment from a previously uploaded image. */
+  createImageAttachment(image: UploadedImage): Promise<unknown> {
+    return createImageAttachment(this.endpoints, image)
+  }
+
   /**
    * Publishes a Note to the authenticated account's feed.
    * This operation has an irreversible external side effect.
@@ -237,6 +253,11 @@ export class SubstackClient {
    */
   scheduleNote(request: ScheduleNoteRequest): Promise<unknown> {
     return scheduleNote(this.endpoints, request)
+  }
+
+  /** Updates a scheduled Note draft and its scheduled publication time. */
+  updateScheduledNote(id: number | string, request: UpdateScheduledNoteRequest): Promise<unknown> {
+    return updateScheduledNote(this.endpoints, id, request)
   }
 
   getActivity(filter: ActivityFilter = 'all'): Promise<ActivityFeed> {
@@ -280,6 +301,13 @@ export class SubstackClient {
   private put<T = unknown>(path: string, body: unknown): Promise<T> {
     return this.request<T>(this.globalApiBase, path, {
       method: 'PUT',
+      body: JSON.stringify(body)
+    })
+  }
+
+  private patch<T = unknown>(path: string, body: unknown): Promise<T> {
+    return this.request<T>(this.globalApiBase, path, {
+      method: 'PATCH',
       body: JSON.stringify(body)
     })
   }

@@ -67,9 +67,12 @@ Copy [`.dev.vars.example`](.dev.vars.example) to `.dev.vars` and replace the pla
 | `getUnreadActivity()` | Activity feed annotated using Substack's unread count. |
 | `getFollowing()` | Accounts followed by the authenticated account. |
 | `testConnectivity()` | Whether the session can perform a lightweight API request. |
-| `createAttachment({ url, type: 'link' })` | Creates a link attachment for a Note. |
+| `uploadImage(dataUrl)` | Uploads a base64 data-URL image and returns Substack media metadata. |
+| `createImageAttachment(uploadedImage)` | Creates a Note image attachment from an uploaded image. |
+| `createAttachment(request)` | Creates a link or image attachment for a Note. |
 | `publishNote(request)` | Publishes a Note to the authenticated account's feed. |
 | `scheduleNote(request)` | Creates a Note draft scheduled for publication at `triggerAt`. |
+| `updateScheduledNote(id, request)` | Updates a scheduled Note draft and its publication time. |
 
 The client returns upstream JSON unchanged, except `getUnreadActivity()` and `getPostWithEngagement()`, which add calculated convenience data. It exports `SubstackApiError`, `SubstackConfigurationError`, `apiBase`, `ACTIVITY_FILTERS`, and its public TypeScript types.
 
@@ -100,7 +103,7 @@ This is an activity feed, so it can include both replies and mentions. To fetch 
 
 ## Publishing Notes
 
-`publishNote` creates public content. Its `bodyJson` is passed directly to Substack's ProseMirror-style Notes API. To attach a link, call `createAttachment` first and include its returned ID in `attachmentIds`.
+`publishNote` creates public content. Its `bodyJson` is passed directly to Substack's ProseMirror-style Notes API. Create a link or image attachment first, then include its returned ID in `attachmentIds`.
 
 ```ts
 const attachment = await client.createAttachment({
@@ -118,6 +121,21 @@ await client.publishNote({
   surface: 'feed',
   replyMinimumRole: 'everyone',
   attachmentIds: [attachment.id]
+})
+```
+
+To upload and attach an image, pass the browser's `data:image/...;base64,...` value to `uploadImage`, then pass the upload result to `createImageAttachment`.
+
+```ts
+const image = await client.uploadImage('data:image/png;base64,...')
+const attachment = await client.createImageAttachment(image)
+
+await client.publishNote({
+  bodyJson: { type: 'doc', attrs: { schemaVersion: 'v1' }, content: [] },
+  tabId: 'for-you',
+  surface: 'feed',
+  replyMinimumRole: 'everyone',
+  attachmentIds: [(attachment as { id: string }).id]
 })
 ```
 
@@ -148,6 +166,16 @@ const drafts = await client.getDraftNotes({ limit: 20 })
 ```
 
 `deleteNote` permanently deletes a Note or Note draft. Confirm the ID before calling it.
+
+Use `updateScheduledNote` to change a scheduled draft's contents or scheduled time. It sends `triggerAt` as Substack's `trigger_at` field.
+
+```ts
+await client.updateScheduledNote(289737400, {
+  bodyJson: { type: 'doc', attrs: { schemaVersion: 'v1', title: null }, content: [] },
+  replyMinimumRole: 'everyone',
+  triggerAt: '2026-07-17T14:01:00.000Z'
+})
+```
 
 ```ts
 await client.deleteNote(296235019)

@@ -350,13 +350,53 @@ describe('SubstackClient', () => {
     expect(calls).toEqual([
       {
         method: 'POST',
-        url: 'https://substack.com/api/v1/comment/attachment/',
+        url: 'https://substack.com/api/v1/comment/attachment',
         body: attachment
       },
       {
         method: 'POST',
         url: 'https://substack.com/api/v1/comment/feed/',
         body: note
+      }
+    ])
+  })
+
+  test('uploads data-URL images and creates image attachments', async () => {
+    const calls: Array<{ method: string; url: string; body: unknown }> = []
+    const uploadedImage = {
+      id: 303230018,
+      url: 'https://substack-post-media.s3.amazonaws.com/public/images/example.png',
+      contentType: 'image/png',
+      bytes: 17797,
+      imageWidth: 404,
+      imageHeight: 390
+    }
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async (input, init) => {
+        const request = new Request(input, init)
+        calls.push({ method: request.method, url: request.url, body: await request.json() })
+        return Response.json(calls.length === 1 ? uploadedImage : { id: 'image-attachment-id' })
+      }
+    })
+
+    await expect(client.uploadImage('data:image/png;base64,aGVsbG8=')).resolves.toEqual(uploadedImage)
+    await expect(client.createImageAttachment(uploadedImage)).resolves.toEqual({ id: 'image-attachment-id' })
+    expect(calls).toEqual([
+      {
+        method: 'POST',
+        url: 'https://substack.com/api/v1/image',
+        body: { image: 'data:image/png;base64,aGVsbG8=' }
+      },
+      {
+        method: 'POST',
+        url: 'https://substack.com/api/v1/comment/attachment',
+        body: {
+          type: 'image',
+          imageUrl: uploadedImage.url,
+          imageWidth: 404,
+          imageHeight: 390
+        }
       }
     ])
   })
@@ -405,6 +445,36 @@ describe('SubstackClient', () => {
         }
       }
     ])
+  })
+
+  test('updates a scheduled Note through the global feed comment endpoint', async () => {
+    let request: Request | undefined
+    const response = { id: 289737400, status: 'draft', trigger_at: '2026-07-17T14:01:00.000Z' }
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async (input, init) => {
+        request = new Request(input, init)
+        return Response.json(response)
+      }
+    })
+    const note = {
+      bodyJson: {
+        type: 'doc',
+        attrs: { schemaVersion: 'v1', title: null },
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Updated scheduled note' }] }]
+      },
+      replyMinimumRole: 'everyone' as const,
+      triggerAt: '2026-07-17T14:01:00.000Z'
+    }
+
+    await expect(client.updateScheduledNote(289737400, note)).resolves.toEqual(response)
+    expect(request?.url).toBe('https://substack.com/api/v1/feed/comment/289737400')
+    expect(request?.method).toBe('PATCH')
+    expect(await request?.json()).toEqual({
+      bodyJson: note.bodyJson,
+      replyMinimumRole: 'everyone',
+      trigger_at: '2026-07-17T14:01:00.000Z'
+    })
   })
 
   test('gets scheduled Note drafts through the global drafts endpoint', async () => {

@@ -124,9 +124,30 @@ export type SubscriberStatsResponse<T = unknown> = {
 }
 
 /** Payload for Substack's link-attachment endpoint. */
-export interface CreateAttachmentRequest {
+export interface CreateLinkAttachmentRequest {
   url: string
   type: 'link'
+}
+
+/** Payload for attaching an uploaded image to a Note. */
+export interface CreateImageAttachmentRequest {
+  type: 'image'
+  imageUrl: string
+  imageWidth: number
+  imageHeight: number
+}
+
+/** Payload accepted by Substack's Note attachment endpoint. */
+export type CreateAttachmentRequest = CreateLinkAttachmentRequest | CreateImageAttachmentRequest
+
+/** Metadata returned after uploading an image to Substack. */
+export interface UploadedImage {
+  id: number
+  url: string
+  contentType: string
+  bytes: number
+  imageWidth: number
+  imageHeight: number
 }
 
 /**
@@ -147,6 +168,15 @@ export interface PublishNoteRequest {
 /** Payload for scheduling a Note through Substack's draft endpoint. */
 export interface ScheduleNoteRequest extends PublishNoteRequest {
   /** ISO 8601 timestamp at which Substack should publish the Note. */
+  triggerAt: string
+}
+
+/** Payload for editing a scheduled Note draft. */
+export interface UpdateScheduledNoteRequest {
+  /** The ProseMirror-style Note document accepted by Substack's web API. */
+  bodyJson: unknown
+  replyMinimumRole: 'everyone'
+  /** ISO 8601 timestamp at which Substack should publish the updated Note. */
   triggerAt: string
 }
 

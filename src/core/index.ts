@@ -5,6 +5,8 @@ export {
   type ActivityFeed,
   type ActivityFilter,
   type CreateAttachmentRequest,
+  type CreateImageAttachmentRequest,
+  type CreateLinkAttachmentRequest,
   type CursorOptions,
   type DraftNotesOptions,
   type DraftNotesPage,
@@ -20,5 +22,7 @@ export {
   type SubstackPostComment,
   type SubstackClientOptions,
   type SubscriberStatsResponse,
-  type UnreadActivityFeed
+  type UnreadActivityFeed,
+  type UploadedImage,
+  type UpdateScheduledNoteRequest
 } from './types.js'

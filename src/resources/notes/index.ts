@@ -6,7 +6,9 @@ import type {
   DraftNotesOptions,
   DraftNotesPage,
   PublishNoteRequest,
-  ScheduleNoteRequest
+  ScheduleNoteRequest,
+  UploadedImage,
+  UpdateScheduledNoteRequest
 } from '../../core/types.js'
 
 function cursorQuery(options?: CursorOptions): string {
@@ -57,7 +59,22 @@ export function getPostComments<T = unknown>(context: EndpointContext, id: numbe
 }
 
 export function createAttachment(context: EndpointContext, request: CreateAttachmentRequest): Promise<unknown> {
-  return context.post('/comment/attachment/', request)
+  return context.post('/comment/attachment', request)
+}
+
+/** Uploads a data-URL image and returns its Substack media metadata. */
+export function uploadImage(context: EndpointContext, image: string): Promise<UploadedImage> {
+  return context.post('/image', { image })
+}
+
+/** Creates a Note image attachment from a previously uploaded image. */
+export function createImageAttachment(context: EndpointContext, image: UploadedImage): Promise<unknown> {
+  return createAttachment(context, {
+    type: 'image',
+    imageUrl: image.url,
+    imageWidth: image.imageWidth,
+    imageHeight: image.imageHeight
+  })
 }
 
 export function publishNote(context: EndpointContext, request: PublishNoteRequest): Promise<unknown> {
@@ -68,4 +85,17 @@ export function publishNote(context: EndpointContext, request: PublishNoteReques
 export function scheduleNote(context: EndpointContext, request: ScheduleNoteRequest): Promise<unknown> {
   const { triggerAt, ...note } = request
   return context.post('/comment/draft', { ...note, trigger_at: triggerAt })
+}
+
+/** Updates a scheduled Note draft. The API expects trigger_at in snake_case. */
+export function updateScheduledNote(
+  context: EndpointContext,
+  id: number | string,
+  request: UpdateScheduledNoteRequest
+): Promise<unknown> {
+  const { triggerAt, ...note } = request
+  return context.patch(`/feed/comment/${positiveInteger(id, 'Scheduled Note ID')}`, {
+    ...note,
+    trigger_at: triggerAt
+  })
 }
