@@ -132,9 +132,7 @@ export interface CreateLinkAttachmentRequest {
 /** Payload for attaching an uploaded image to a Note. */
 export interface CreateImageAttachmentRequest {
   type: 'image'
-  imageUrl: string
-  imageWidth: number
-  imageHeight: number
+  url: string
 }
 
 /** Payload accepted by Substack's Note attachment endpoint. */
