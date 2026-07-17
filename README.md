@@ -29,7 +29,15 @@ const notes = await client.getNotes()
 
 `sessionToken` is the value of the `substack.sid` cookie only: do not pass `substack.sid=` or a complete `Cookie` header. Store it only in trusted server-side environment variables—never expose it in browser code, client bundles, issues, or logs.
 
-`publicationUrl` is required for publication-scoped methods such as `getNotes`, `getNote`, `getComment`, `getPostComments`, `getEmailStats`, `getSubscriberStats`, `getProfileNotes`, and `getFollowing`. It accepts a bare host or a copied browser URL; query strings and fragments are discarded safely.
+`publicationUrl` is required for publication-scoped methods such as `getNotes`, `getNote`, `getComment`, `getPostComments`, `getEmailStats`, `getSubscriberStats`, `getProfileNotes`, and `getFollowing`. It accepts any HTTPS publication domain (including a custom domain) or a copied browser URL; query strings and fragments are discarded safely.
+
+## Direct Substack requests only
+
+This SDK has no Substack gateway dependency. Global API requests go directly to `https://substack.com` by default. Publication-scoped requests go directly to the `publicationUrl` you configure, including a custom domain.
+
+Custom domains are supported, but they are a trust decision: the SDK sends the authenticated `substack.sid` cookie to the exact HTTPS origin in `publicationUrl`. Configure only a Substack publication domain you control or trust. Do not use a third-party, self-hosted, or closed-source Substack gateway, because it would receive that cookie. Redirects remain disabled so a configured origin cannot forward the cookie to another domain.
+
+The optional `baseUrl` and legacy `substackUrl` overrides follow the same rule. Leave them unset for normal direct requests to `https://substack.com`; set either only when you intend to trust that HTTPS origin with the session cookie.
 
 ## Local configuration
 
@@ -45,21 +53,39 @@ Copy [`.dev.vars.example`](.dev.vars.example) to `.dev.vars` and replace the pla
 | `getProfilePosts(id)` | Posts for a numeric profile ID. |
 | `getProfileNotes(id, { cursor })` | Notes feed for a numeric profile ID. |
 | `getPost(id)` | Post by global Substack ID. |
+| `getPostWithEngagement(id, { includeAutomodHidden })` | Full post, visible comment tree, and calculated engagement totals. Requires `publicationUrl`. |
 | `getPostComments(id)` | Comments for a post. |
 | `getEmailStats({ offset, limit, orderBy, orderDirection })` | Publication email delivery and engagement stats. Defaults: `0`, `20`, `post_date`, `desc`. Requires a publication administrator session. |
 | `getAllEmailStats({ offset, limit, orderBy, orderDirection })` | Fetches every email-stat page and returns one flat array of rows. |
 | `getSubscriberStats()` | Publication subscriber records and aggregate count. The response may contain subscriber personal data. |
 | `getNotes({ cursor })` | Authenticated publication Notes feed. |
+| `getDraftNotes({ limit })` | Scheduled Note drafts for the authenticated account. Defaults to 20. |
 | `getNote(id)` | Note by ID. |
 | `getComment(id)` | Comment by ID. |
+| `deleteNote(id)` | Permanently deletes an authenticated user's Note or Note draft. |
 | `getActivity(filter)` | Activity feed. Filters: `all`, `replies-and-mentions`, `restacks`. |
 | `getUnreadActivity()` | Activity feed annotated using Substack's unread count. |
 | `getFollowing()` | Accounts followed by the authenticated account. |
 | `testConnectivity()` | Whether the session can perform a lightweight API request. |
 | `createAttachment({ url, type: 'link' })` | Creates a link attachment for a Note. |
 | `publishNote(request)` | Publishes a Note to the authenticated account's feed. |
+| `scheduleNote(request)` | Creates a Note draft scheduled for publication at `triggerAt`. |
 
-The client returns upstream JSON unchanged, except `getUnreadActivity()`, which returns an annotated activity feed. It exports `SubstackApiError`, `SubstackConfigurationError`, `apiBase`, `ACTIVITY_FILTERS`, and its public TypeScript types.
+The client returns upstream JSON unchanged, except `getUnreadActivity()` and `getPostWithEngagement()`, which add calculated convenience data. It exports `SubstackApiError`, `SubstackConfigurationError`, `apiBase`, `ACTIVITY_FILTERS`, and its public TypeScript types.
+
+## Post engagement
+
+`getPostWithEngagement(id)` fetches the post and its comments concurrently. It returns the raw visible comment tree in `comments`, the same comments flattened depth-first in `commentItems`, and reported plus calculated visible engagement totals in `engagement`. Automoderated comments are excluded by default; request them separately with `includeAutomodHidden: true`.
+
+```ts
+const result = await client.getPostWithEngagement(193463596, {
+  includeAutomodHidden: true
+})
+
+console.log(result.engagement.visibleCommentCount)
+console.log(result.commentItems)
+console.log(result.automodHiddenComments)
+```
 
 ## Replies and mentions
 
@@ -93,6 +119,38 @@ await client.publishNote({
   replyMinimumRole: 'everyone',
   attachmentIds: [attachment.id]
 })
+```
+
+## Scheduling Notes
+
+`scheduleNote` creates a server-side draft and schedules it for publication. Pass an ISO 8601 timestamp as `triggerAt`; the SDK sends it to Substack as `trigger_at`.
+
+```ts
+await client.scheduleNote({
+  bodyJson: {
+    type: 'doc',
+    attrs: { schemaVersion: 'v1', title: null },
+    content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Scheduled note' }] }]
+  },
+  tabId: 'subscribed',
+  surface: 'feed',
+  replyMinimumRole: 'everyone',
+  triggerAt: '2026-07-18T08:12:00.000Z'
+})
+```
+
+## Managing scheduled drafts
+
+`getDraftNotes` returns Substack's paged draft response, including each draft's `trigger_at`, attachments, `hasMore`, and `nextCursor` fields.
+
+```ts
+const drafts = await client.getDraftNotes({ limit: 20 })
+```
+
+`deleteNote` permanently deletes a Note or Note draft. Confirm the ID before calling it.
+
+```ts
+await client.deleteNote(296235019)
 ```
 
 ## Development

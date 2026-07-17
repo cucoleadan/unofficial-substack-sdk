@@ -1,6 +1,13 @@
 import type { EndpointContext } from '../../core/transport.js'
 import { positiveInteger } from '../../core/validation.js'
-import type { CreateAttachmentRequest, CursorOptions, PublishNoteRequest } from '../../core/types.js'
+import type {
+  CreateAttachmentRequest,
+  CursorOptions,
+  DraftNotesOptions,
+  DraftNotesPage,
+  PublishNoteRequest,
+  ScheduleNoteRequest
+} from '../../core/types.js'
 
 function cursorQuery(options?: CursorOptions): string {
   return options?.cursor ? `?cursor=${encodeURIComponent(options.cursor)}` : ''
@@ -8,6 +15,15 @@ function cursorQuery(options?: CursorOptions): string {
 
 export function getNotes(context: EndpointContext, options: CursorOptions = {}): Promise<unknown> {
   return context.publication(`/notes${cursorQuery(options)}`)
+}
+
+/** Returns scheduled Note drafts for the authenticated account. */
+export function getDraftNotes<T = unknown>(
+  context: EndpointContext,
+  options: DraftNotesOptions = {}
+): Promise<DraftNotesPage<T>> {
+  const limit = positiveInteger(options.limit ?? 20, 'Draft notes limit')
+  return context.global(`/feed/drafts?limit=${limit}`)
 }
 
 export function getProfileNotes(
@@ -31,7 +47,12 @@ export function getComment(context: EndpointContext, id: number | string): Promi
   return context.publication(`/reader/comment/${positiveInteger(id, 'Comment ID')}`)
 }
 
-export function getPostComments(context: EndpointContext, id: number | string): Promise<unknown> {
+/** Permanently deletes a Note or Note draft owned by the authenticated account. */
+export function deleteNote(context: EndpointContext, id: number | string): Promise<unknown> {
+  return context.remove(`/comment/${positiveInteger(id, 'Note ID')}`)
+}
+
+export function getPostComments<T = unknown>(context: EndpointContext, id: number | string): Promise<T> {
   return context.publication(`/post/${positiveInteger(id, 'Post ID')}/comments`)
 }
 
@@ -41,4 +62,10 @@ export function createAttachment(context: EndpointContext, request: CreateAttach
 
 export function publishNote(context: EndpointContext, request: PublishNoteRequest): Promise<unknown> {
   return context.post('/comment/feed/', request)
+}
+
+/** Creates a scheduled Note draft. The API expects trigger_at in snake_case. */
+export function scheduleNote(context: EndpointContext, request: ScheduleNoteRequest): Promise<unknown> {
+  const { triggerAt, ...note } = request
+  return context.post('/comment/draft', { ...note, trigger_at: triggerAt })
 }

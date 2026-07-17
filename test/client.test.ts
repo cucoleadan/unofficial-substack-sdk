@@ -18,6 +18,12 @@ describe('apiBase', () => {
     expect(() => apiBase('')).toThrow(SubstackConfigurationError)
     expect(() => apiBase('https://substack.com', '/')).toThrow(SubstackConfigurationError)
   })
+
+  test('accepts HTTPS custom publication origins and rejects insecure ones', () => {
+    expect(apiBase('https://newsletter.example.com')).toBe('https://newsletter.example.com/api/v1/')
+    expect(apiBase('https://newsletter.example.com:8443')).toBe('https://newsletter.example.com:8443/api/v1/')
+    expect(() => apiBase('http://substack.com')).toThrow(SubstackConfigurationError)
+  })
 })
 
 describe('SubstackClient', () => {
@@ -35,6 +41,153 @@ describe('SubstackClient', () => {
 
     expect(request?.url).toBe('https://substack.com/api/v1/posts/by-id/123')
     expect(request?.headers.get('accept')).toBe('application/json')
+    expect(request?.headers.get('cookie')).toBe('substack.sid=session-value')
+    expect(request?.redirect).toBe('error')
+  })
+
+  test('combines a post and its visible comments with calculated engagement totals', async () => {
+    const requests: string[] = []
+    const visibleComments = [
+      {
+        id: 10,
+        reaction_count: 2,
+        restacks: 1,
+        children: [
+          {
+            id: 11,
+            reaction_count: 3,
+            restacks: 0,
+            children: [{ id: 12, reaction_count: 0, restacks: 2, children: [] }]
+          }
+        ]
+      },
+      { id: 13, reaction_count: 5, restacks: 0, children: [] }
+    ]
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://newsletter.example.com',
+      fetch: async (input) => {
+        const url = new Request(input).url
+        requests.push(url)
+        if (url.endsWith('/posts/by-id/123')) {
+          return Response.json({
+            post: {
+              id: 123,
+              reactions: { '❤': 8 },
+              reaction_count: 8,
+              restacks: 3,
+              comment_count: 5,
+              child_comment_count: 3
+            },
+            publication: { id: 99 },
+            publicationSettings: { comments_enabled: true }
+          })
+        }
+
+        return Response.json({
+          comments: visibleComments,
+          automod_hidden_comments: [{ id: 14, reaction_count: 7, restacks: 4, children: [] }]
+        })
+      }
+    })
+
+    const result = await client.getPostWithEngagement(123)
+
+    expect(requests).toEqual([
+      'https://substack.com/api/v1/posts/by-id/123',
+      'https://newsletter.example.com/api/v1/post/123/comments'
+    ])
+    expect(result).toEqual({
+      post: {
+        id: 123,
+        reactions: { '❤': 8 },
+        reaction_count: 8,
+        restacks: 3,
+        comment_count: 5,
+        child_comment_count: 3
+      },
+      publication: { id: 99 },
+      publicationSettings: { comments_enabled: true },
+      comments: visibleComments,
+      commentItems: [
+        visibleComments[0],
+        visibleComments[0].children[0],
+        visibleComments[0].children[0].children[0],
+        visibleComments[1]
+      ],
+      engagement: {
+        reactions: { '❤': 8 },
+        reactionCount: 8,
+        restackCount: 3,
+        reportedCommentCount: 5,
+        reportedReplyCount: 3,
+        visibleRootCommentCount: 2,
+        visibleCommentCount: 4,
+        visibleReplyCount: 2,
+        commentReactionCount: 10,
+        commentRestackCount: 3
+      }
+    })
+    expect(result).not.toHaveProperty('automodHiddenComments')
+  })
+
+  test('returns automod-hidden comments only when requested', async () => {
+    const hiddenComments = [{ id: 14, children: [] }]
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://newsletter.example.com',
+      fetch: async (input) => {
+        const url = new Request(input).url
+        return Response.json(
+          url.endsWith('/posts/by-id/123')
+            ? { post: { id: 123 } }
+            : { comments: [], automod_hidden_comments: hiddenComments }
+        )
+      }
+    })
+
+    await expect(client.getPostWithEngagement(123, { includeAutomodHidden: true })).resolves.toMatchObject({
+      comments: [],
+      commentItems: [],
+      automodHiddenComments: hiddenComments,
+      engagement: {
+        visibleRootCommentCount: 0,
+        visibleCommentCount: 0,
+        visibleReplyCount: 0,
+        commentReactionCount: 0,
+        commentRestackCount: 0
+      }
+    })
+  })
+
+  test('requires a publication URL before requesting combined post engagement', () => {
+    let fetchCalled = false
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async () => {
+        fetchCalled = true
+        return Response.json({})
+      }
+    })
+
+    expect(() => client.getPostWithEngagement(123)).toThrow(SubstackConfigurationError)
+    expect(fetchCalled).toBe(false)
+  })
+
+  test('uses a supplied custom domain for publication-scoped requests', async () => {
+    let request: Request | undefined
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://newsletter.example.com',
+      fetch: async (input, init) => {
+        request = new Request(input, init)
+        return Response.json({ items: [] })
+      }
+    })
+
+    await client.getNotes()
+
+    expect(request?.url).toBe('https://newsletter.example.com/api/v1/notes')
     expect(request?.headers.get('cookie')).toBe('substack.sid=session-value')
   })
 
@@ -206,6 +359,103 @@ describe('SubstackClient', () => {
         body: note
       }
     ])
+  })
+
+  test('schedules a Note through the global draft endpoint', async () => {
+    const calls: Array<{ method: string; url: string; body: unknown }> = []
+    const scheduledDraft = {
+      id: 296235019,
+      status: 'draft',
+      trigger_at: '2026-07-18T08:12:00.000Z',
+      reaction_count: 0,
+      restacks: 0,
+      children_count: 0
+    }
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async (input, init) => {
+        const request = new Request(input, init)
+        calls.push({
+          method: request.method,
+          url: request.url,
+          body: await request.json()
+        })
+        return Response.json(scheduledDraft)
+      }
+    })
+    const note = {
+      bodyJson: { type: 'doc', attrs: { schemaVersion: 'v1', title: null }, content: [] },
+      tabId: 'subscribed',
+      surface: 'feed',
+      replyMinimumRole: 'everyone' as const,
+      triggerAt: '2026-07-18T08:12:00.000Z'
+    }
+
+    await expect(client.scheduleNote(note)).resolves.toEqual(scheduledDraft)
+    expect(calls).toEqual([
+      {
+        method: 'POST',
+        url: 'https://substack.com/api/v1/comment/draft',
+        body: {
+          bodyJson: note.bodyJson,
+          tabId: 'subscribed',
+          surface: 'feed',
+          replyMinimumRole: 'everyone',
+          trigger_at: '2026-07-18T08:12:00.000Z'
+        }
+      }
+    ])
+  })
+
+  test('gets scheduled Note drafts through the global drafts endpoint', async () => {
+    let request: Request | undefined
+    const response = {
+      drafts: [
+        {
+          id: 296235019,
+          body: 'Test',
+          trigger_at: '2026-07-18T08:12:00.000Z',
+          attachments: []
+        }
+      ],
+      hasMore: false,
+      nextCursor: null
+    }
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async (input, init) => {
+        request = new Request(input, init)
+        return Response.json(response)
+      }
+    })
+
+    await expect(
+      client.getDraftNotes<{ id: number; body: string; trigger_at: string; attachments: unknown[] }>()
+    ).resolves.toEqual(response)
+    expect(request?.url).toBe('https://substack.com/api/v1/feed/drafts?limit=20')
+    expect(request?.method).toBe('GET')
+  })
+
+  test('validates the scheduled Note drafts limit', () => {
+    const client = new SubstackClient({ sessionToken: 'session-value' })
+
+    expect(() => client.getDraftNotes({ limit: 0 })).toThrow(SubstackConfigurationError)
+  })
+
+  test('deletes a Note through the global comment endpoint', async () => {
+    let request: Request | undefined
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async (input, init) => {
+        request = new Request(input, init)
+        return new Response(null, { status: 204 })
+      }
+    })
+
+    await expect(client.deleteNote(296235019)).resolves.toBeUndefined()
+    expect(request?.url).toBe('https://substack.com/api/v1/comment/296235019')
+    expect(request?.method).toBe('DELETE')
+    expect(request?.headers.get('cookie')).toBe('substack.sid=session-value')
   })
 
   test('resolves a profile ID through its public handle', async () => {

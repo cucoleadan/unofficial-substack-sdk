@@ -5,11 +5,16 @@ import type {
   ActivityFilter,
   CreateAttachmentRequest,
   CursorOptions,
+  DraftNotesOptions,
+  DraftNotesPage,
   EmailStatsOptions,
   EmailStatsPage,
   FetchLike,
+  PostWithEngagement,
+  PostWithEngagementOptions,
   PublishNoteRequest,
   ProfilePostsOptions,
+  ScheduleNoteRequest,
   SubstackClientOptions,
   SubscriberStatsResponse,
   UnreadActivityFeed
@@ -18,14 +23,17 @@ import { getActivity, getUnreadActivity } from '../resources/activity/index.js'
 import { getAllEmailStats, getEmailStats } from '../resources/email-stats/index.js'
 import {
   createAttachment,
+  deleteNote,
   getComment,
+  getDraftNotes,
   getNote,
   getNotes,
   getPostComments,
   getProfileNotes,
-  publishNote
+  publishNote,
+  scheduleNote
 } from '../resources/notes/index.js'
-import { getPost } from '../resources/posts/index.js'
+import { getPost, getPostWithEngagement } from '../resources/posts/index.js'
 import {
   getAuthenticatedProfile,
   getFollowing,
@@ -45,16 +53,29 @@ function normalizeOrigin(value: string): URL {
     throw new SubstackConfigurationError('A Substack base URL cannot be empty.')
   }
 
+  let url: URL
   try {
-    return new URL(trimmed)
+    url = new URL(trimmed)
   } catch {
-    return new URL(`https://${trimmed}`)
+    try {
+      url = new URL(`https://${trimmed}`)
+    } catch {
+      throw new SubstackConfigurationError('A valid Substack HTTPS URL is required.')
+    }
   }
+
+  if (url.protocol !== 'https:') {
+    throw new SubstackConfigurationError('A Substack API URL must use HTTPS.')
+  }
+
+  return url
 }
 
 /**
- * Normalizes a Substack origin into an API base. Query strings and fragments
- * from copied browser URLs are intentionally discarded.
+ * Normalizes an HTTPS Substack or custom-publication origin into an API base.
+ * Query strings and fragments from copied browser URLs are intentionally
+ * discarded. The caller is responsible for trusting custom origins because the
+ * session cookie is sent to the configured publication URL.
  */
 export function apiBase(value: string, prefix = DEFAULT_API_PREFIX): string {
   const url = normalizeOrigin(value)
@@ -99,7 +120,8 @@ export class SubstackClient {
       global: <T = unknown>(path: string) => this.global<T>(path),
       publication: <T = unknown>(path: string) => this.publication<T>(path),
       post: <T = unknown>(path: string, body: unknown) => this.post<T>(path, body),
-      put: <T = unknown>(path: string, body: unknown) => this.put<T>(path, body)
+      put: <T = unknown>(path: string, body: unknown) => this.put<T>(path, body),
+      remove: <T = unknown>(path: string) => this.remove<T>(path)
     }
   }
 
@@ -119,12 +141,29 @@ export class SubstackClient {
     return getPost(this.endpoints, id)
   }
 
+  /**
+   * Returns a full post, its visible comment tree, and calculated engagement
+   * totals. A publication URL is required to retrieve post comments.
+   */
+  getPostWithEngagement(
+    id: string | number,
+    options: PostWithEngagementOptions = {}
+  ): Promise<PostWithEngagement> {
+    this.requirePublicationApiBase()
+    return getPostWithEngagement(this.endpoints, id, options)
+  }
+
   getProfilePosts(id: number | string, options: ProfilePostsOptions = {}): Promise<unknown> {
     return getProfilePosts(this.endpoints, id, options)
   }
 
   getNotes(options: CursorOptions = {}): Promise<unknown> {
     return getNotes(this.endpoints, options)
+  }
+
+  /** Returns scheduled Note drafts for the authenticated account. */
+  getDraftNotes<T = unknown>(options: DraftNotesOptions = {}): Promise<DraftNotesPage<T>> {
+    return getDraftNotes<T>(this.endpoints, options)
   }
 
   getProfileNotes(id: number | string, options: CursorOptions = {}): Promise<unknown> {
@@ -137,6 +176,14 @@ export class SubstackClient {
 
   getComment(id: number | string): Promise<unknown> {
     return getComment(this.endpoints, id)
+  }
+
+  /**
+   * Permanently deletes a Note or Note draft owned by the authenticated account.
+   * This operation has an irreversible external side effect.
+   */
+  deleteNote(id: number | string): Promise<unknown> {
+    return deleteNote(this.endpoints, id)
   }
 
   getPostComments(id: number | string): Promise<unknown> {
@@ -184,6 +231,14 @@ export class SubstackClient {
     return publishNote(this.endpoints, request)
   }
 
+  /**
+   * Creates a scheduled Note draft that Substack will publish at triggerAt.
+   * This operation creates server-side content but does not publish immediately.
+   */
+  scheduleNote(request: ScheduleNoteRequest): Promise<unknown> {
+    return scheduleNote(this.endpoints, request)
+  }
+
   getActivity(filter: ActivityFilter = 'all'): Promise<ActivityFeed> {
     return getActivity(this.endpoints, filter)
   }
@@ -210,12 +265,16 @@ export class SubstackClient {
   }
 
   private publication<T = unknown>(path: string): Promise<T> {
+    return this.request<T>(this.requirePublicationApiBase(), path)
+  }
+
+  private requirePublicationApiBase(): string {
     if (!this.publicationApiBase) {
       throw new SubstackConfigurationError(
         'A Substack publication URL is required for publication-scoped routes.'
       )
     }
-    return this.request<T>(this.publicationApiBase, path)
+    return this.publicationApiBase
   }
 
   private put<T = unknown>(path: string, body: unknown): Promise<T> {
@@ -223,6 +282,10 @@ export class SubstackClient {
       method: 'PUT',
       body: JSON.stringify(body)
     })
+  }
+
+  private remove<T = unknown>(path: string): Promise<T> {
+    return this.request<T>(this.globalApiBase, path, { method: 'DELETE' })
   }
 
   private post<T = unknown>(path: string, body: unknown): Promise<T> {
@@ -244,8 +307,8 @@ export class SubstackClient {
     // Do not store native fetch as an instance method: platform fetch
     // implementations require their global receiver.
     const response = this.fetchImpl
-      ? await this.fetchImpl(url, { ...init, headers })
-      : await globalThis.fetch(url, { ...init, headers })
+      ? await this.fetchImpl(url, { ...init, headers, redirect: 'error' })
+      : await globalThis.fetch(url, { ...init, headers, redirect: 'error' })
     const body = await response.text()
 
     if (!response.ok) {

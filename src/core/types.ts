@@ -9,9 +9,16 @@ export interface SubstackClientOptions {
   sessionToken?: string
   /** Legacy alias for sessionToken. */
   token?: string
-  /** Publication origin used by publication-scoped endpoints. */
+  /**
+   * HTTPS publication origin used by publication-scoped endpoints. Custom
+   * domains are supported; callers must ensure the domain is trusted because
+   * it receives the authenticated session cookie.
+   */
   publicationUrl?: string
-  /** Global Substack origin. Defaults to https://substack.com. */
+  /**
+   * Global Substack origin. Defaults to https://substack.com. It must use
+   * HTTPS; overriding it sends the authenticated session cookie to that origin.
+   */
   baseUrl?: string
   /** Legacy alias for baseUrl. */
   substackUrl?: string
@@ -29,9 +36,67 @@ export interface CursorOptions {
   cursor?: string
 }
 
+/** Options for the authenticated account's scheduled Note drafts. */
+export interface DraftNotesOptions {
+  /** Maximum drafts to return. Defaults to 20. */
+  limit?: number
+}
+
+/** An unmodified page from Substack's scheduled Note drafts endpoint. */
+export type DraftNotesPage<T = unknown> = {
+  drafts?: T[]
+  hasMore?: boolean
+  nextCursor?: unknown
+  [key: string]: unknown
+}
+
 export interface ProfilePostsOptions {
   limit?: number
   offset?: number
+}
+
+/** Controls optional data returned by getPostWithEngagement. */
+export interface PostWithEngagementOptions {
+  /** Include automoderated comments separately from the visible comment tree. Defaults to false. */
+  includeAutomodHidden?: boolean
+}
+
+/** An unmodified comment object returned by Substack's post-comments endpoint. */
+export interface SubstackPostComment {
+  children?: SubstackPostComment[]
+  reaction_count?: number
+  restacks?: number
+  [key: string]: unknown
+}
+
+/** Aggregate post and visible-comment engagement data. */
+export interface PostEngagement {
+  reactions?: unknown
+  reactionCount?: number
+  restackCount?: number
+  /** The count reported by the post endpoint, which can include hidden or moderated comments. */
+  reportedCommentCount?: number
+  /** The reply count reported by the post endpoint. */
+  reportedReplyCount?: number
+  visibleRootCommentCount: number
+  visibleCommentCount: number
+  visibleReplyCount: number
+  commentReactionCount: number
+  commentRestackCount: number
+}
+
+/** A full post paired with its visible comment tree and calculated engagement totals. */
+export interface PostWithEngagement {
+  post: Record<string, unknown>
+  publication?: unknown
+  publicationSettings?: unknown
+  /** Root comments only, with replies retained in each comment's children array. */
+  comments: SubstackPostComment[]
+  /** Every visible comment and reply in depth-first order. */
+  commentItems: SubstackPostComment[]
+  /** Returned only when includeAutomodHidden is true; never mixed with visible comments. */
+  automodHiddenComments?: SubstackPostComment[]
+  engagement: PostEngagement
 }
 
 /** Options for a publication's email performance report. */
@@ -77,6 +142,12 @@ export interface PublishNoteRequest {
   surface: string
   replyMinimumRole: 'everyone'
   attachmentIds?: string[]
+}
+
+/** Payload for scheduling a Note through Substack's draft endpoint. */
+export interface ScheduleNoteRequest extends PublishNoteRequest {
+  /** ISO 8601 timestamp at which Substack should publish the Note. */
+  triggerAt: string
 }
 
 export interface UnreadActivityMetadata {
