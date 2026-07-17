@@ -361,6 +361,52 @@ describe('SubstackClient', () => {
     ])
   })
 
+  test('schedules a Note through the global draft endpoint', async () => {
+    const calls: Array<{ method: string; url: string; body: unknown }> = []
+    const scheduledDraft = {
+      id: 296235019,
+      status: 'draft',
+      trigger_at: '2026-07-18T08:12:00.000Z',
+      reaction_count: 0,
+      restacks: 0,
+      children_count: 0
+    }
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async (input, init) => {
+        const request = new Request(input, init)
+        calls.push({
+          method: request.method,
+          url: request.url,
+          body: await request.json()
+        })
+        return Response.json(scheduledDraft)
+      }
+    })
+    const note = {
+      bodyJson: { type: 'doc', attrs: { schemaVersion: 'v1', title: null }, content: [] },
+      tabId: 'subscribed',
+      surface: 'feed',
+      replyMinimumRole: 'everyone' as const,
+      triggerAt: '2026-07-18T08:12:00.000Z'
+    }
+
+    await expect(client.scheduleNote(note)).resolves.toEqual(scheduledDraft)
+    expect(calls).toEqual([
+      {
+        method: 'POST',
+        url: 'https://substack.com/api/v1/comment/draft',
+        body: {
+          bodyJson: note.bodyJson,
+          tabId: 'subscribed',
+          surface: 'feed',
+          replyMinimumRole: 'everyone',
+          trigger_at: '2026-07-18T08:12:00.000Z'
+        }
+      }
+    ])
+  })
+
   test('resolves a profile ID through its public handle', async () => {
     const calls: string[] = []
     const client = new SubstackClient({

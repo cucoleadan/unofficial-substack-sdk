@@ -1,6 +1,11 @@
 import type { EndpointContext } from '../../core/transport.js'
 import { positiveInteger } from '../../core/validation.js'
-import type { CreateAttachmentRequest, CursorOptions, PublishNoteRequest } from '../../core/types.js'
+import type {
+  CreateAttachmentRequest,
+  CursorOptions,
+  PublishNoteRequest,
+  ScheduleNoteRequest
+} from '../../core/types.js'
 
 function cursorQuery(options?: CursorOptions): string {
   return options?.cursor ? `?cursor=${encodeURIComponent(options.cursor)}` : ''
@@ -41,4 +46,10 @@ export function createAttachment(context: EndpointContext, request: CreateAttach
 
 export function publishNote(context: EndpointContext, request: PublishNoteRequest): Promise<unknown> {
   return context.post('/comment/feed/', request)
+}
+
+/** Creates a scheduled Note draft. The API expects trigger_at in snake_case. */
+export function scheduleNote(context: EndpointContext, request: ScheduleNoteRequest): Promise<unknown> {
+  const { triggerAt, ...note } = request
+  return context.post('/comment/draft', { ...note, trigger_at: triggerAt })
 }

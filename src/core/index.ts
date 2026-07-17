@@ -14,6 +14,7 @@ export {
   type PostWithEngagementOptions,
   type PublishNoteRequest,
   type ProfilePostsOptions,
+  type ScheduleNoteRequest,
   type SubstackPostComment,
   type SubstackClientOptions,
   type SubscriberStatsResponse,

@@ -130,6 +130,12 @@ export interface PublishNoteRequest {
   attachmentIds?: string[]
 }
 
+/** Payload for scheduling a Note through Substack's draft endpoint. */
+export interface ScheduleNoteRequest extends PublishNoteRequest {
+  /** ISO 8601 timestamp at which Substack should publish the Note. */
+  triggerAt: string
+}
+
 export interface UnreadActivityMetadata {
   count: number
   max?: unknown

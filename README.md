@@ -67,6 +67,7 @@ Copy [`.dev.vars.example`](.dev.vars.example) to `.dev.vars` and replace the pla
 | `testConnectivity()` | Whether the session can perform a lightweight API request. |
 | `createAttachment({ url, type: 'link' })` | Creates a link attachment for a Note. |
 | `publishNote(request)` | Publishes a Note to the authenticated account's feed. |
+| `scheduleNote(request)` | Creates a Note draft scheduled for publication at `triggerAt`. |
 
 The client returns upstream JSON unchanged, except `getUnreadActivity()` and `getPostWithEngagement()`, which add calculated convenience data. It exports `SubstackApiError`, `SubstackConfigurationError`, `apiBase`, `ACTIVITY_FILTERS`, and its public TypeScript types.
 
@@ -115,6 +116,24 @@ await client.publishNote({
   surface: 'feed',
   replyMinimumRole: 'everyone',
   attachmentIds: [attachment.id]
+})
+```
+
+## Scheduling Notes
+
+`scheduleNote` creates a server-side draft and schedules it for publication. Pass an ISO 8601 timestamp as `triggerAt`; the SDK sends it to Substack as `trigger_at`.
+
+```ts
+await client.scheduleNote({
+  bodyJson: {
+    type: 'doc',
+    attrs: { schemaVersion: 'v1', title: null },
+    content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Scheduled note' }] }]
+  },
+  tabId: 'subscribed',
+  surface: 'feed',
+  replyMinimumRole: 'everyone',
+  triggerAt: '2026-07-18T08:12:00.000Z'
 })
 ```
 

@@ -12,6 +12,7 @@ import type {
   PostWithEngagementOptions,
   PublishNoteRequest,
   ProfilePostsOptions,
+  ScheduleNoteRequest,
   SubstackClientOptions,
   SubscriberStatsResponse,
   UnreadActivityFeed
@@ -25,7 +26,8 @@ import {
   getNotes,
   getPostComments,
   getProfileNotes,
-  publishNote
+  publishNote,
+  scheduleNote
 } from '../resources/notes/index.js'
 import { getPost, getPostWithEngagement } from '../resources/posts/index.js'
 import {
@@ -209,6 +211,14 @@ export class SubstackClient {
    */
   publishNote(request: PublishNoteRequest): Promise<unknown> {
     return publishNote(this.endpoints, request)
+  }
+
+  /**
+   * Creates a scheduled Note draft that Substack will publish at triggerAt.
+   * This operation creates server-side content but does not publish immediately.
+   */
+  scheduleNote(request: ScheduleNoteRequest): Promise<unknown> {
+    return scheduleNote(this.endpoints, request)
   }
 
   getActivity(filter: ActivityFilter = 'all'): Promise<ActivityFeed> {
