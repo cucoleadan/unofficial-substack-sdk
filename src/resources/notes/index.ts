@@ -70,10 +70,8 @@ export function uploadImage(context: EndpointContext, image: string): Promise<Up
 /** Creates a Note image attachment from a previously uploaded image. */
 export function createImageAttachment(context: EndpointContext, image: UploadedImage): Promise<unknown> {
   return createAttachment(context, {
+    url: image.url,
     type: 'image',
-    imageUrl: image.url,
-    imageWidth: image.imageWidth,
-    imageHeight: image.imageHeight
   })
 }
 
