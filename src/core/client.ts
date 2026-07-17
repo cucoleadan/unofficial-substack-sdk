@@ -8,6 +8,8 @@ import type {
   EmailStatsOptions,
   EmailStatsPage,
   FetchLike,
+  PostWithEngagement,
+  PostWithEngagementOptions,
   PublishNoteRequest,
   ProfilePostsOptions,
   SubstackClientOptions,
@@ -25,7 +27,7 @@ import {
   getProfileNotes,
   publishNote
 } from '../resources/notes/index.js'
-import { getPost } from '../resources/posts/index.js'
+import { getPost, getPostWithEngagement } from '../resources/posts/index.js'
 import {
   getAuthenticatedProfile,
   getFollowing,
@@ -132,6 +134,18 @@ export class SubstackClient {
     return getPost(this.endpoints, id)
   }
 
+  /**
+   * Returns a full post, its visible comment tree, and calculated engagement
+   * totals. A publication URL is required to retrieve post comments.
+   */
+  getPostWithEngagement(
+    id: string | number,
+    options: PostWithEngagementOptions = {}
+  ): Promise<PostWithEngagement> {
+    this.requirePublicationApiBase()
+    return getPostWithEngagement(this.endpoints, id, options)
+  }
+
   getProfilePosts(id: number | string, options: ProfilePostsOptions = {}): Promise<unknown> {
     return getProfilePosts(this.endpoints, id, options)
   }
@@ -223,12 +237,16 @@ export class SubstackClient {
   }
 
   private publication<T = unknown>(path: string): Promise<T> {
+    return this.request<T>(this.requirePublicationApiBase(), path)
+  }
+
+  private requirePublicationApiBase(): string {
     if (!this.publicationApiBase) {
       throw new SubstackConfigurationError(
         'A Substack publication URL is required for publication-scoped routes.'
       )
     }
-    return this.request<T>(this.publicationApiBase, path)
+    return this.publicationApiBase
   }
 
   private put<T = unknown>(path: string, body: unknown): Promise<T> {

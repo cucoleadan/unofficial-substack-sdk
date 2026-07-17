@@ -45,6 +45,135 @@ describe('SubstackClient', () => {
     expect(request?.redirect).toBe('error')
   })
 
+  test('combines a post and its visible comments with calculated engagement totals', async () => {
+    const requests: string[] = []
+    const visibleComments = [
+      {
+        id: 10,
+        reaction_count: 2,
+        restacks: 1,
+        children: [
+          {
+            id: 11,
+            reaction_count: 3,
+            restacks: 0,
+            children: [{ id: 12, reaction_count: 0, restacks: 2, children: [] }]
+          }
+        ]
+      },
+      { id: 13, reaction_count: 5, restacks: 0, children: [] }
+    ]
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://newsletter.example.com',
+      fetch: async (input) => {
+        const url = new Request(input).url
+        requests.push(url)
+        if (url.endsWith('/posts/by-id/123')) {
+          return Response.json({
+            post: {
+              id: 123,
+              reactions: { '❤': 8 },
+              reaction_count: 8,
+              restacks: 3,
+              comment_count: 5,
+              child_comment_count: 3
+            },
+            publication: { id: 99 },
+            publicationSettings: { comments_enabled: true }
+          })
+        }
+
+        return Response.json({
+          comments: visibleComments,
+          automod_hidden_comments: [{ id: 14, reaction_count: 7, restacks: 4, children: [] }]
+        })
+      }
+    })
+
+    const result = await client.getPostWithEngagement(123)
+
+    expect(requests).toEqual([
+      'https://substack.com/api/v1/posts/by-id/123',
+      'https://newsletter.example.com/api/v1/post/123/comments'
+    ])
+    expect(result).toEqual({
+      post: {
+        id: 123,
+        reactions: { '❤': 8 },
+        reaction_count: 8,
+        restacks: 3,
+        comment_count: 5,
+        child_comment_count: 3
+      },
+      publication: { id: 99 },
+      publicationSettings: { comments_enabled: true },
+      comments: visibleComments,
+      commentItems: [
+        visibleComments[0],
+        visibleComments[0].children[0],
+        visibleComments[0].children[0].children[0],
+        visibleComments[1]
+      ],
+      engagement: {
+        reactions: { '❤': 8 },
+        reactionCount: 8,
+        restackCount: 3,
+        reportedCommentCount: 5,
+        reportedReplyCount: 3,
+        visibleRootCommentCount: 2,
+        visibleCommentCount: 4,
+        visibleReplyCount: 2,
+        commentReactionCount: 10,
+        commentRestackCount: 3
+      }
+    })
+    expect(result).not.toHaveProperty('automodHiddenComments')
+  })
+
+  test('returns automod-hidden comments only when requested', async () => {
+    const hiddenComments = [{ id: 14, children: [] }]
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://newsletter.example.com',
+      fetch: async (input) => {
+        const url = new Request(input).url
+        return Response.json(
+          url.endsWith('/posts/by-id/123')
+            ? { post: { id: 123 } }
+            : { comments: [], automod_hidden_comments: hiddenComments }
+        )
+      }
+    })
+
+    await expect(client.getPostWithEngagement(123, { includeAutomodHidden: true })).resolves.toMatchObject({
+      comments: [],
+      commentItems: [],
+      automodHiddenComments: hiddenComments,
+      engagement: {
+        visibleRootCommentCount: 0,
+        visibleCommentCount: 0,
+        visibleReplyCount: 0,
+        commentReactionCount: 0,
+        commentRestackCount: 0
+      }
+    })
+  })
+
+  test('requires a publication URL before requesting combined post engagement', () => {
+    let fetchCalled = false
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async () => {
+        fetchCalled = true
+        return Response.json({})
+      }
+    })
+
+    expect(() => client.getPostWithEngagement(123)).toThrow(SubstackConfigurationError)
+    expect(fetchCalled).toBe(false)
+  })
+
   test('uses a supplied custom domain for publication-scoped requests', async () => {
     let request: Request | undefined
     const client = new SubstackClient({

@@ -9,8 +9,12 @@ export {
   type EmailStatsOptions,
   type EmailStatsPage,
   type FetchLike,
+  type PostEngagement,
+  type PostWithEngagement,
+  type PostWithEngagementOptions,
   type PublishNoteRequest,
   type ProfilePostsOptions,
+  type SubstackPostComment,
   type SubstackClientOptions,
   type SubscriberStatsResponse,
   type UnreadActivityFeed

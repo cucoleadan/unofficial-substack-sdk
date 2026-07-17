@@ -31,7 +31,7 @@ export function getComment(context: EndpointContext, id: number | string): Promi
   return context.publication(`/reader/comment/${positiveInteger(id, 'Comment ID')}`)
 }
 
-export function getPostComments(context: EndpointContext, id: number | string): Promise<unknown> {
+export function getPostComments<T = unknown>(context: EndpointContext, id: number | string): Promise<T> {
   return context.publication(`/post/${positiveInteger(id, 'Post ID')}/comments`)
 }
 

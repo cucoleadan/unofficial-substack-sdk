@@ -41,6 +41,50 @@ export interface ProfilePostsOptions {
   offset?: number
 }
 
+/** Controls optional data returned by getPostWithEngagement. */
+export interface PostWithEngagementOptions {
+  /** Include automoderated comments separately from the visible comment tree. Defaults to false. */
+  includeAutomodHidden?: boolean
+}
+
+/** An unmodified comment object returned by Substack's post-comments endpoint. */
+export interface SubstackPostComment {
+  children?: SubstackPostComment[]
+  reaction_count?: number
+  restacks?: number
+  [key: string]: unknown
+}
+
+/** Aggregate post and visible-comment engagement data. */
+export interface PostEngagement {
+  reactions?: unknown
+  reactionCount?: number
+  restackCount?: number
+  /** The count reported by the post endpoint, which can include hidden or moderated comments. */
+  reportedCommentCount?: number
+  /** The reply count reported by the post endpoint. */
+  reportedReplyCount?: number
+  visibleRootCommentCount: number
+  visibleCommentCount: number
+  visibleReplyCount: number
+  commentReactionCount: number
+  commentRestackCount: number
+}
+
+/** A full post paired with its visible comment tree and calculated engagement totals. */
+export interface PostWithEngagement {
+  post: Record<string, unknown>
+  publication?: unknown
+  publicationSettings?: unknown
+  /** Root comments only, with replies retained in each comment's children array. */
+  comments: SubstackPostComment[]
+  /** Every visible comment and reply in depth-first order. */
+  commentItems: SubstackPostComment[]
+  /** Returned only when includeAutomodHidden is true; never mixed with visible comments. */
+  automodHiddenComments?: SubstackPostComment[]
+  engagement: PostEngagement
+}
+
 /** Options for a publication's email performance report. */
 export interface EmailStatsOptions {
   /** Zero-based row offset. Defaults to 0. */
