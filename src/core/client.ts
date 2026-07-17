@@ -5,6 +5,8 @@ import type {
   ActivityFilter,
   CreateAttachmentRequest,
   CursorOptions,
+  DraftNotesOptions,
+  DraftNotesPage,
   EmailStatsOptions,
   EmailStatsPage,
   FetchLike,
@@ -21,7 +23,9 @@ import { getActivity, getUnreadActivity } from '../resources/activity/index.js'
 import { getAllEmailStats, getEmailStats } from '../resources/email-stats/index.js'
 import {
   createAttachment,
+  deleteNote,
   getComment,
+  getDraftNotes,
   getNote,
   getNotes,
   getPostComments,
@@ -116,7 +120,8 @@ export class SubstackClient {
       global: <T = unknown>(path: string) => this.global<T>(path),
       publication: <T = unknown>(path: string) => this.publication<T>(path),
       post: <T = unknown>(path: string, body: unknown) => this.post<T>(path, body),
-      put: <T = unknown>(path: string, body: unknown) => this.put<T>(path, body)
+      put: <T = unknown>(path: string, body: unknown) => this.put<T>(path, body),
+      remove: <T = unknown>(path: string) => this.remove<T>(path)
     }
   }
 
@@ -156,6 +161,11 @@ export class SubstackClient {
     return getNotes(this.endpoints, options)
   }
 
+  /** Returns scheduled Note drafts for the authenticated account. */
+  getDraftNotes<T = unknown>(options: DraftNotesOptions = {}): Promise<DraftNotesPage<T>> {
+    return getDraftNotes<T>(this.endpoints, options)
+  }
+
   getProfileNotes(id: number | string, options: CursorOptions = {}): Promise<unknown> {
     return getProfileNotes(this.endpoints, id, options)
   }
@@ -166,6 +176,14 @@ export class SubstackClient {
 
   getComment(id: number | string): Promise<unknown> {
     return getComment(this.endpoints, id)
+  }
+
+  /**
+   * Permanently deletes a Note or Note draft owned by the authenticated account.
+   * This operation has an irreversible external side effect.
+   */
+  deleteNote(id: number | string): Promise<unknown> {
+    return deleteNote(this.endpoints, id)
   }
 
   getPostComments(id: number | string): Promise<unknown> {
@@ -264,6 +282,10 @@ export class SubstackClient {
       method: 'PUT',
       body: JSON.stringify(body)
     })
+  }
+
+  private remove<T = unknown>(path: string): Promise<T> {
+    return this.request<T>(this.globalApiBase, path, { method: 'DELETE' })
   }
 
   private post<T = unknown>(path: string, body: unknown): Promise<T> {

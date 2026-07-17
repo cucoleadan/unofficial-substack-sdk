@@ -3,6 +3,8 @@ import { positiveInteger } from '../../core/validation.js'
 import type {
   CreateAttachmentRequest,
   CursorOptions,
+  DraftNotesOptions,
+  DraftNotesPage,
   PublishNoteRequest,
   ScheduleNoteRequest
 } from '../../core/types.js'
@@ -13,6 +15,15 @@ function cursorQuery(options?: CursorOptions): string {
 
 export function getNotes(context: EndpointContext, options: CursorOptions = {}): Promise<unknown> {
   return context.publication(`/notes${cursorQuery(options)}`)
+}
+
+/** Returns scheduled Note drafts for the authenticated account. */
+export function getDraftNotes<T = unknown>(
+  context: EndpointContext,
+  options: DraftNotesOptions = {}
+): Promise<DraftNotesPage<T>> {
+  const limit = positiveInteger(options.limit ?? 20, 'Draft notes limit')
+  return context.global(`/feed/drafts?limit=${limit}`)
 }
 
 export function getProfileNotes(
@@ -34,6 +45,11 @@ export function getNote(context: EndpointContext, id: number | string): Promise<
 
 export function getComment(context: EndpointContext, id: number | string): Promise<unknown> {
   return context.publication(`/reader/comment/${positiveInteger(id, 'Comment ID')}`)
+}
+
+/** Permanently deletes a Note or Note draft owned by the authenticated account. */
+export function deleteNote(context: EndpointContext, id: number | string): Promise<unknown> {
+  return context.remove(`/comment/${positiveInteger(id, 'Note ID')}`)
 }
 
 export function getPostComments<T = unknown>(context: EndpointContext, id: number | string): Promise<T> {

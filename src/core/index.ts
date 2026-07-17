@@ -6,6 +6,8 @@ export {
   type ActivityFilter,
   type CreateAttachmentRequest,
   type CursorOptions,
+  type DraftNotesOptions,
+  type DraftNotesPage,
   type EmailStatsOptions,
   type EmailStatsPage,
   type FetchLike,

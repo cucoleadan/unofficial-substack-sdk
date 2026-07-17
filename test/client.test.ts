@@ -407,6 +407,57 @@ describe('SubstackClient', () => {
     ])
   })
 
+  test('gets scheduled Note drafts through the global drafts endpoint', async () => {
+    let request: Request | undefined
+    const response = {
+      drafts: [
+        {
+          id: 296235019,
+          body: 'Test',
+          trigger_at: '2026-07-18T08:12:00.000Z',
+          attachments: []
+        }
+      ],
+      hasMore: false,
+      nextCursor: null
+    }
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async (input, init) => {
+        request = new Request(input, init)
+        return Response.json(response)
+      }
+    })
+
+    await expect(
+      client.getDraftNotes<{ id: number; body: string; trigger_at: string; attachments: unknown[] }>()
+    ).resolves.toEqual(response)
+    expect(request?.url).toBe('https://substack.com/api/v1/feed/drafts?limit=20')
+    expect(request?.method).toBe('GET')
+  })
+
+  test('validates the scheduled Note drafts limit', () => {
+    const client = new SubstackClient({ sessionToken: 'session-value' })
+
+    expect(() => client.getDraftNotes({ limit: 0 })).toThrow(SubstackConfigurationError)
+  })
+
+  test('deletes a Note through the global comment endpoint', async () => {
+    let request: Request | undefined
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async (input, init) => {
+        request = new Request(input, init)
+        return new Response(null, { status: 204 })
+      }
+    })
+
+    await expect(client.deleteNote(296235019)).resolves.toBeUndefined()
+    expect(request?.url).toBe('https://substack.com/api/v1/comment/296235019')
+    expect(request?.method).toBe('DELETE')
+    expect(request?.headers.get('cookie')).toBe('substack.sid=session-value')
+  })
+
   test('resolves a profile ID through its public handle', async () => {
     const calls: string[] = []
     const client = new SubstackClient({

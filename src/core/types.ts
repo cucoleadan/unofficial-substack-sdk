@@ -36,6 +36,20 @@ export interface CursorOptions {
   cursor?: string
 }
 
+/** Options for the authenticated account's scheduled Note drafts. */
+export interface DraftNotesOptions {
+  /** Maximum drafts to return. Defaults to 20. */
+  limit?: number
+}
+
+/** An unmodified page from Substack's scheduled Note drafts endpoint. */
+export type DraftNotesPage<T = unknown> = {
+  drafts?: T[]
+  hasMore?: boolean
+  nextCursor?: unknown
+  [key: string]: unknown
+}
+
 export interface ProfilePostsOptions {
   limit?: number
   offset?: number

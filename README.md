@@ -59,8 +59,10 @@ Copy [`.dev.vars.example`](.dev.vars.example) to `.dev.vars` and replace the pla
 | `getAllEmailStats({ offset, limit, orderBy, orderDirection })` | Fetches every email-stat page and returns one flat array of rows. |
 | `getSubscriberStats()` | Publication subscriber records and aggregate count. The response may contain subscriber personal data. |
 | `getNotes({ cursor })` | Authenticated publication Notes feed. |
+| `getDraftNotes({ limit })` | Scheduled Note drafts for the authenticated account. Defaults to 20. |
 | `getNote(id)` | Note by ID. |
 | `getComment(id)` | Comment by ID. |
+| `deleteNote(id)` | Permanently deletes an authenticated user's Note or Note draft. |
 | `getActivity(filter)` | Activity feed. Filters: `all`, `replies-and-mentions`, `restacks`. |
 | `getUnreadActivity()` | Activity feed annotated using Substack's unread count. |
 | `getFollowing()` | Accounts followed by the authenticated account. |
@@ -135,6 +137,20 @@ await client.scheduleNote({
   replyMinimumRole: 'everyone',
   triggerAt: '2026-07-18T08:12:00.000Z'
 })
+```
+
+## Managing scheduled drafts
+
+`getDraftNotes` returns Substack's paged draft response, including each draft's `trigger_at`, attachments, `hasMore`, and `nextCursor` fields.
+
+```ts
+const drafts = await client.getDraftNotes({ limit: 20 })
+```
+
+`deleteNote` permanently deletes a Note or Note draft. Confirm the ID before calling it.
+
+```ts
+await client.deleteNote(296235019)
 ```
 
 ## Development
