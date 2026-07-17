@@ -407,6 +407,36 @@ describe('SubstackClient', () => {
     ])
   })
 
+  test('updates a scheduled Note through the global feed comment endpoint', async () => {
+    let request: Request | undefined
+    const response = { id: 289737400, status: 'draft', trigger_at: '2026-07-17T14:01:00.000Z' }
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async (input, init) => {
+        request = new Request(input, init)
+        return Response.json(response)
+      }
+    })
+    const note = {
+      bodyJson: {
+        type: 'doc',
+        attrs: { schemaVersion: 'v1', title: null },
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Updated scheduled note' }] }]
+      },
+      replyMinimumRole: 'everyone' as const,
+      triggerAt: '2026-07-17T14:01:00.000Z'
+    }
+
+    await expect(client.updateScheduledNote(289737400, note)).resolves.toEqual(response)
+    expect(request?.url).toBe('https://substack.com/api/v1/feed/comment/289737400')
+    expect(request?.method).toBe('PATCH')
+    expect(await request?.json()).toEqual({
+      bodyJson: note.bodyJson,
+      replyMinimumRole: 'everyone',
+      trigger_at: '2026-07-17T14:01:00.000Z'
+    })
+  })
+
   test('gets scheduled Note drafts through the global drafts endpoint', async () => {
     let request: Request | undefined
     const response = {

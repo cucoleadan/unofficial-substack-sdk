@@ -17,7 +17,8 @@ import type {
   ScheduleNoteRequest,
   SubstackClientOptions,
   SubscriberStatsResponse,
-  UnreadActivityFeed
+  UnreadActivityFeed,
+  UpdateScheduledNoteRequest
 } from './types.js'
 import { getActivity, getUnreadActivity } from '../resources/activity/index.js'
 import { getAllEmailStats, getEmailStats } from '../resources/email-stats/index.js'
@@ -31,7 +32,8 @@ import {
   getPostComments,
   getProfileNotes,
   publishNote,
-  scheduleNote
+  scheduleNote,
+  updateScheduledNote
 } from '../resources/notes/index.js'
 import { getPost, getPostWithEngagement } from '../resources/posts/index.js'
 import {
@@ -120,6 +122,7 @@ export class SubstackClient {
       global: <T = unknown>(path: string) => this.global<T>(path),
       publication: <T = unknown>(path: string) => this.publication<T>(path),
       post: <T = unknown>(path: string, body: unknown) => this.post<T>(path, body),
+      patch: <T = unknown>(path: string, body: unknown) => this.patch<T>(path, body),
       put: <T = unknown>(path: string, body: unknown) => this.put<T>(path, body),
       remove: <T = unknown>(path: string) => this.remove<T>(path)
     }
@@ -239,6 +242,11 @@ export class SubstackClient {
     return scheduleNote(this.endpoints, request)
   }
 
+  /** Updates a scheduled Note draft and its scheduled publication time. */
+  updateScheduledNote(id: number | string, request: UpdateScheduledNoteRequest): Promise<unknown> {
+    return updateScheduledNote(this.endpoints, id, request)
+  }
+
   getActivity(filter: ActivityFilter = 'all'): Promise<ActivityFeed> {
     return getActivity(this.endpoints, filter)
   }
@@ -280,6 +288,13 @@ export class SubstackClient {
   private put<T = unknown>(path: string, body: unknown): Promise<T> {
     return this.request<T>(this.globalApiBase, path, {
       method: 'PUT',
+      body: JSON.stringify(body)
+    })
+  }
+
+  private patch<T = unknown>(path: string, body: unknown): Promise<T> {
+    return this.request<T>(this.globalApiBase, path, {
+      method: 'PATCH',
       body: JSON.stringify(body)
     })
   }

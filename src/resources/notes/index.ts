@@ -6,7 +6,8 @@ import type {
   DraftNotesOptions,
   DraftNotesPage,
   PublishNoteRequest,
-  ScheduleNoteRequest
+  ScheduleNoteRequest,
+  UpdateScheduledNoteRequest
 } from '../../core/types.js'
 
 function cursorQuery(options?: CursorOptions): string {
@@ -68,4 +69,17 @@ export function publishNote(context: EndpointContext, request: PublishNoteReques
 export function scheduleNote(context: EndpointContext, request: ScheduleNoteRequest): Promise<unknown> {
   const { triggerAt, ...note } = request
   return context.post('/comment/draft', { ...note, trigger_at: triggerAt })
+}
+
+/** Updates a scheduled Note draft. The API expects trigger_at in snake_case. */
+export function updateScheduledNote(
+  context: EndpointContext,
+  id: number | string,
+  request: UpdateScheduledNoteRequest
+): Promise<unknown> {
+  const { triggerAt, ...note } = request
+  return context.patch(`/feed/comment/${positiveInteger(id, 'Scheduled Note ID')}`, {
+    ...note,
+    trigger_at: triggerAt
+  })
 }

@@ -150,6 +150,15 @@ export interface ScheduleNoteRequest extends PublishNoteRequest {
   triggerAt: string
 }
 
+/** Payload for editing a scheduled Note draft. */
+export interface UpdateScheduledNoteRequest {
+  /** The ProseMirror-style Note document accepted by Substack's web API. */
+  bodyJson: unknown
+  replyMinimumRole: 'everyone'
+  /** ISO 8601 timestamp at which Substack should publish the updated Note. */
+  triggerAt: string
+}
+
 export interface UnreadActivityMetadata {
   count: number
   max?: unknown

@@ -20,5 +20,6 @@ export {
   type SubstackPostComment,
   type SubstackClientOptions,
   type SubscriberStatsResponse,
-  type UnreadActivityFeed
+  type UnreadActivityFeed,
+  type UpdateScheduledNoteRequest
 } from './types.js'

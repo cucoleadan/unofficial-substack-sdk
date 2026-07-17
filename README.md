@@ -70,6 +70,7 @@ Copy [`.dev.vars.example`](.dev.vars.example) to `.dev.vars` and replace the pla
 | `createAttachment({ url, type: 'link' })` | Creates a link attachment for a Note. |
 | `publishNote(request)` | Publishes a Note to the authenticated account's feed. |
 | `scheduleNote(request)` | Creates a Note draft scheduled for publication at `triggerAt`. |
+| `updateScheduledNote(id, request)` | Updates a scheduled Note draft and its publication time. |
 
 The client returns upstream JSON unchanged, except `getUnreadActivity()` and `getPostWithEngagement()`, which add calculated convenience data. It exports `SubstackApiError`, `SubstackConfigurationError`, `apiBase`, `ACTIVITY_FILTERS`, and its public TypeScript types.
 
@@ -148,6 +149,16 @@ const drafts = await client.getDraftNotes({ limit: 20 })
 ```
 
 `deleteNote` permanently deletes a Note or Note draft. Confirm the ID before calling it.
+
+Use `updateScheduledNote` to change a scheduled draft's contents or scheduled time. It sends `triggerAt` as Substack's `trigger_at` field.
+
+```ts
+await client.updateScheduledNote(289737400, {
+  bodyJson: { type: 'doc', attrs: { schemaVersion: 'v1', title: null }, content: [] },
+  replyMinimumRole: 'everyone',
+  triggerAt: '2026-07-17T14:01:00.000Z'
+})
+```
 
 ```ts
 await client.deleteNote(296235019)
