@@ -265,6 +265,32 @@ describe('SubstackClient', () => {
     )
   })
 
+  test('gets Note reply branches through the global reader endpoint', async () => {
+    let request: Request | undefined
+    const response = {
+      commentBranches: [{ comment: { id: 300751001 }, descendantComments: [] }],
+      moreBranches: 0,
+      nextCursor: null,
+      rootComment: { id: 300750684 },
+      automodHiddenBranches: []
+    }
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async (input, init) => {
+        request = new Request(input, init)
+        return Response.json(response)
+      }
+    })
+
+    await expect(client.getNoteReplies(300750684)).resolves.toEqual(response)
+    expect(request?.method).toBe('GET')
+    expect(request?.url).toBe(
+      'https://substack.com/api/v1/reader/comment/300750684/replies?comment_id=300750684'
+    )
+    expect(request?.headers.get('cookie')).toBe('substack.sid=session-value')
+    expect(() => client.getNoteReplies(0)).toThrow(SubstackConfigurationError)
+  })
+
   test('gets reply and mention activity through the global activity endpoint', async () => {
     let request: Request | undefined
     const client = new SubstackClient({

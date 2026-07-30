@@ -65,6 +65,16 @@ export type ProfileNotesPage<T extends Record<string, unknown> = Record<string, 
   [key: string]: unknown
 }
 
+/** An unmodified response from Substack's Note replies endpoint. */
+export type NoteRepliesResponse<TBranch = unknown, TRootComment = unknown> = {
+  commentBranches?: TBranch[]
+  moreBranches?: number
+  nextCursor?: string | null
+  rootComment?: TRootComment
+  automodHiddenBranches?: TBranch[]
+  [key: string]: unknown
+}
+
 /** Options for the authenticated account's scheduled Note drafts. */
 export interface DraftNotesOptions {
   /** Maximum drafts to return. Defaults to 20. */
