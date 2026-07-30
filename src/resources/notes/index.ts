@@ -7,6 +7,7 @@ import type {
   DraftNotesPage,
   NoteCommentOptions,
   NoteLikeOptions,
+  NoteRepliesResponse,
   NoteRestackOptions,
   ProfileNoteItem,
   ProfileNotesPage,
@@ -102,6 +103,14 @@ export function getNote(context: EndpointContext, id: number | string): Promise<
 
 export function getComment(context: EndpointContext, id: number | string): Promise<unknown> {
   return context.publication(`/reader/comment/${positiveInteger(id, 'Comment ID')}`)
+}
+
+export function getNoteReplies<TBranch = unknown, TRootComment = unknown>(
+  context: EndpointContext,
+  id: number | string
+): Promise<NoteRepliesResponse<TBranch, TRootComment>> {
+  const noteId = positiveInteger(id, 'Note ID')
+  return context.global(`/reader/comment/${noteId}/replies?comment_id=${noteId}`)
 }
 
 /** Permanently deletes a Note or Note draft owned by the authenticated account. */

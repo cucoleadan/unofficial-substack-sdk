@@ -12,6 +12,7 @@ import type {
   FetchLike,
   NoteCommentOptions,
   NoteLikeOptions,
+  NoteRepliesResponse,
   NoteRestackOptions,
   PostWithEngagement,
   PostWithEngagementOptions,
@@ -36,6 +37,7 @@ import {
   getComment,
   getDraftNotes,
   getNote,
+  getNoteReplies,
   getNotes,
   getPostComments,
   getProfileNotes,
@@ -193,6 +195,13 @@ export class SubstackClient {
 
   getComment(id: number | string): Promise<unknown> {
     return getComment(this.endpoints, id)
+  }
+
+  /** Returns the reply branches for a Note from Substack's global reader endpoint. */
+  getNoteReplies<TBranch = unknown, TRootComment = unknown>(
+    id: number | string
+  ): Promise<NoteRepliesResponse<TBranch, TRootComment>> {
+    return getNoteReplies<TBranch, TRootComment>(this.endpoints, id)
   }
 
   /**

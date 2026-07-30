@@ -62,6 +62,7 @@ Copy [`.dev.vars.example`](.dev.vars.example) to `.dev.vars` and replace the pla
 | `getDraftNotes({ limit })` | Scheduled Note drafts for the authenticated account. Defaults to 20. |
 | `getNote(id)` | Note by ID. |
 | `getComment(id)` | Comment by ID. |
+| `getNoteReplies(id)` | Reply branches, root Note, and pagination metadata for a Note. |
 | `deleteNote(id)` | Permanently deletes an authenticated user's Note or Note draft. |
 | `setNoteLike(id, liked, options)` | Likes or unlikes a Note. |
 | `commentOnNote(id, body, options)` | Adds a plain-text comment to a Note. |

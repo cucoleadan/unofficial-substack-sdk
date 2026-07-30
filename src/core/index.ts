@@ -16,6 +16,7 @@ export {
   type NoteActionOptions,
   type NoteCommentOptions,
   type NoteLikeOptions,
+  type NoteRepliesResponse,
   type NoteRestackOptions,
   type PostEngagement,
   type PostWithEngagement,
