@@ -5,5 +5,5 @@ export interface EndpointContext {
   post<T = unknown>(path: string, body: unknown): Promise<T>
   patch<T = unknown>(path: string, body: unknown): Promise<T>
   put<T = unknown>(path: string, body: unknown): Promise<T>
-  remove<T = unknown>(path: string): Promise<T>
+  remove<T = unknown>(path: string, body?: unknown): Promise<T>
 }
