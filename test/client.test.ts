@@ -230,6 +230,41 @@ describe('SubstackClient', () => {
     expect(request?.url).toBe('https://allagentsconsidered.substack.com/api/v1/notes?cursor=next%20page')
   })
 
+  test('annotates profile Notes with the authenticated viewer like state', async () => {
+    let request: Request | undefined
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://allagentsconsidered.substack.com',
+      fetch: async (input, init) => {
+        request = new Request(input, init)
+        return Response.json({
+          items: [
+            { comment: { id: 1, reaction: '❤', reaction_count: 11 } },
+            { comment: { id: 2, reaction_count: 10 } },
+            { comment: { id: 3, reaction: false } },
+            { comment: { id: 4, reaction: 'unexpected' } },
+            { context: { type: 'note' } }
+          ],
+          nextCursor: null
+        })
+      }
+    })
+
+    await expect(client.getProfileNotes(7)).resolves.toEqual({
+      items: [
+        { comment: { id: 1, reaction: '❤', reaction_count: 11 }, viewerHasLiked: true },
+        { comment: { id: 2, reaction_count: 10 }, viewerHasLiked: false },
+        { comment: { id: 3, reaction: false }, viewerHasLiked: false },
+        { comment: { id: 4, reaction: 'unexpected' }, viewerHasLiked: null },
+        { context: { type: 'note' }, viewerHasLiked: null }
+      ],
+      nextCursor: null
+    })
+    expect(request?.url).toBe(
+      'https://allagentsconsidered.substack.com/api/v1/reader/feed/profile/7?types=note'
+    )
+  })
+
   test('gets reply and mention activity through the global activity endpoint', async () => {
     let request: Request | undefined
     const client = new SubstackClient({
@@ -355,8 +390,200 @@ describe('SubstackClient', () => {
       },
       {
         method: 'POST',
-        url: 'https://substack.com/api/v1/comment/feed/',
+        url: 'https://substack.com/api/v1/comment/feed',
         body: note
+      }
+    ])
+  })
+
+  test('sets Note likes with repeatable POST and DELETE requests', async () => {
+    const calls: Array<{ method: string; url: string; body: unknown; contentType: string | null }> = []
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async (input, init) => {
+        const request = new Request(input, init)
+        calls.push({
+          method: request.method,
+          url: request.url,
+          body: await request.json(),
+          contentType: request.headers.get('content-type')
+        })
+        return Response.json({ reaction_count: request.method === 'POST' ? 11 : 10 })
+      }
+    })
+
+    await expect(client.setNoteLike<{ reaction_count: number }>(302607231, true)).resolves.toEqual({
+      reaction_count: 11
+    })
+    await client.setNoteLike(302607231, true)
+    await client.setNoteLike(302607231, false)
+    await client.setNoteLike(302607231, false)
+
+    const payload = { publication_id: null, reaction: '❤', tabId: 'for-you' }
+    expect(calls).toEqual([
+      {
+        method: 'POST',
+        url: 'https://substack.com/api/v1/comment/302607231/reaction',
+        body: payload,
+        contentType: 'application/json'
+      },
+      {
+        method: 'POST',
+        url: 'https://substack.com/api/v1/comment/302607231/reaction',
+        body: payload,
+        contentType: 'application/json'
+      },
+      {
+        method: 'DELETE',
+        url: 'https://substack.com/api/v1/comment/302607231/reaction',
+        body: payload,
+        contentType: 'application/json'
+      },
+      {
+        method: 'DELETE',
+        url: 'https://substack.com/api/v1/comment/302607231/reaction',
+        body: payload,
+        contentType: 'application/json'
+      }
+    ])
+  })
+
+  test('maps Note action upstream errors', async () => {
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async () =>
+        Response.json(
+          { error: 'rate limited' },
+          {
+            status: 429
+          }
+        )
+    })
+
+    await expect(client.setNoteLike(42, true)).rejects.toMatchObject({
+      name: SubstackApiError.name,
+      status: 429,
+      url: 'https://substack.com/api/v1/comment/42/reaction',
+      detail: '{"error":"rate limited"}'
+    })
+  })
+
+  test('comments on and deletes a Note comment', async () => {
+    const calls: Array<{ method: string; url: string; body: unknown }> = []
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async (input, init) => {
+        const request = new Request(input, init)
+        calls.push({
+          method: request.method,
+          url: request.url,
+          body: await request.json()
+        })
+        return request.method === 'DELETE'
+          ? new Response(null, { status: 204 })
+          : Response.json({ id: 303996871 })
+      }
+    })
+
+    await expect(
+      client.commentOnNote<{ id: number }>(303342892, 'Super insightful!')
+    ).resolves.toEqual({ id: 303996871 })
+    await expect(client.deleteComment(303996871)).resolves.toBeUndefined()
+
+    expect(calls).toEqual([
+      {
+        method: 'POST',
+        url: 'https://substack.com/api/v1/comment/feed',
+        body: {
+          bodyJson: {
+            type: 'doc',
+            attrs: { schemaVersion: 'v1', title: null },
+            content: [
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Super insightful!' }]
+              }
+            ]
+          },
+          parent_id: 303342892,
+          tabId: 'for-you',
+          surface: 'feed',
+          replyMinimumRole: 'everyone'
+        }
+      },
+      {
+        method: 'DELETE',
+        url: 'https://substack.com/api/v1/comment/303996871',
+        body: {}
+      }
+    ])
+  })
+
+  test('validates Note comment bodies', () => {
+    const client = new SubstackClient({ sessionToken: 'session-value' })
+
+    expect(() => client.commentOnNote(1, '')).toThrow(SubstackConfigurationError)
+    expect(() => client.commentOnNote(1, 'x'.repeat(5_001))).toThrow(SubstackConfigurationError)
+  })
+
+  test('sets Note restacks with repeatable POST and DELETE requests', async () => {
+    const calls: Array<{ method: string; url: string; body: unknown }> = []
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async (input, init) => {
+        const request = new Request(input, init)
+        calls.push({
+          method: request.method,
+          url: request.url,
+          body: await request.json()
+        })
+        return Response.json({ restacks: request.method === 'POST' ? 1 : 0 })
+      }
+    })
+
+    await client.setNoteRestack(303342892, true)
+    await client.setNoteRestack(303342892, true)
+    await client.setNoteRestack(303342892, false)
+    await client.setNoteRestack(303342892, false)
+
+    expect(calls).toEqual([
+      {
+        method: 'POST',
+        url: 'https://substack.com/api/v1/restack/feed',
+        body: {
+          postId: null,
+          commentId: 303342892,
+          tabId: 'for-you',
+          surface: 'permalink'
+        }
+      },
+      {
+        method: 'POST',
+        url: 'https://substack.com/api/v1/restack/feed',
+        body: {
+          postId: null,
+          commentId: 303342892,
+          tabId: 'for-you',
+          surface: 'permalink'
+        }
+      },
+      {
+        method: 'DELETE',
+        url: 'https://substack.com/api/v1/restack/feed',
+        body: {
+          postId: null,
+          commentId: 303342892,
+          tabId: 'for-you'
+        }
+      },
+      {
+        method: 'DELETE',
+        url: 'https://substack.com/api/v1/restack/feed',
+        body: {
+          postId: null,
+          commentId: 303342892,
+          tabId: 'for-you'
+        }
       }
     ])
   })

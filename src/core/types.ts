@@ -36,6 +36,35 @@ export interface CursorOptions {
   cursor?: string
 }
 
+export interface NoteActionOptions {
+  /** Feed tab context sent to Substack. Defaults to `for-you`. */
+  tabId?: string
+}
+
+export interface NoteLikeOptions extends NoteActionOptions {
+  /** Publication context sent to Substack. Defaults to null. */
+  publicationId?: number | null
+}
+
+export interface NoteCommentOptions extends NoteActionOptions {
+  /** Interaction surface sent to Substack. Defaults to `feed`. */
+  surface?: string
+}
+
+export interface NoteRestackOptions extends NoteActionOptions {
+  /** Interaction surface sent when creating a restack. Defaults to `permalink`. */
+  surface?: string
+}
+
+export type ProfileNoteItem<T extends Record<string, unknown> = Record<string, unknown>> = T & {
+  viewerHasLiked: boolean | null
+}
+
+export type ProfileNotesPage<T extends Record<string, unknown> = Record<string, unknown>> = {
+  items?: ProfileNoteItem<T>[]
+  [key: string]: unknown
+}
+
 /** Options for the authenticated account's scheduled Note drafts. */
 export interface DraftNotesOptions {
   /** Maximum drafts to return. Defaults to 20. */

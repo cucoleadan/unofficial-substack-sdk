@@ -10,8 +10,12 @@ import type {
   EmailStatsOptions,
   EmailStatsPage,
   FetchLike,
+  NoteCommentOptions,
+  NoteLikeOptions,
+  NoteRestackOptions,
   PostWithEngagement,
   PostWithEngagementOptions,
+  ProfileNotesPage,
   PublishNoteRequest,
   ProfilePostsOptions,
   ScheduleNoteRequest,
@@ -24,8 +28,10 @@ import type {
 import { getActivity, getUnreadActivity } from '../resources/activity/index.js'
 import { getAllEmailStats, getEmailStats } from '../resources/email-stats/index.js'
 import {
+  commentOnNote,
   createAttachment,
   createImageAttachment,
+  deleteComment,
   deleteNote,
   getComment,
   getDraftNotes,
@@ -35,6 +41,8 @@ import {
   getProfileNotes,
   publishNote,
   scheduleNote,
+  setNoteLike,
+  setNoteRestack,
   uploadImage,
   updateScheduledNote
 } from '../resources/notes/index.js'
@@ -127,7 +135,7 @@ export class SubstackClient {
       post: <T = unknown>(path: string, body: unknown) => this.post<T>(path, body),
       patch: <T = unknown>(path: string, body: unknown) => this.patch<T>(path, body),
       put: <T = unknown>(path: string, body: unknown) => this.put<T>(path, body),
-      remove: <T = unknown>(path: string) => this.remove<T>(path)
+      remove: <T = unknown>(path: string, body?: unknown) => this.remove<T>(path, body)
     }
   }
 
@@ -172,8 +180,11 @@ export class SubstackClient {
     return getDraftNotes<T>(this.endpoints, options)
   }
 
-  getProfileNotes(id: number | string, options: CursorOptions = {}): Promise<unknown> {
-    return getProfileNotes(this.endpoints, id, options)
+  getProfileNotes<T extends Record<string, unknown> = Record<string, unknown>>(
+    id: number | string,
+    options: CursorOptions = {}
+  ): Promise<ProfileNotesPage<T>> {
+    return getProfileNotes<T>(this.endpoints, id, options)
   }
 
   getNote(id: number | string): Promise<unknown> {
@@ -190,6 +201,38 @@ export class SubstackClient {
    */
   deleteNote(id: number | string): Promise<unknown> {
     return deleteNote(this.endpoints, id)
+  }
+
+  /** Sets the authenticated account's like state for a Note. */
+  setNoteLike<T = unknown>(
+    id: number | string,
+    liked: boolean,
+    options: NoteLikeOptions = {}
+  ): Promise<T> {
+    return setNoteLike<T>(this.endpoints, id, liked, options)
+  }
+
+  /** Adds a plain-text comment to a Note. */
+  commentOnNote<T = unknown>(
+    id: number | string,
+    body: string,
+    options: NoteCommentOptions = {}
+  ): Promise<T> {
+    return commentOnNote<T>(this.endpoints, id, body, options)
+  }
+
+  /** Permanently deletes a comment owned by the authenticated account. */
+  deleteComment<T = unknown>(id: number | string): Promise<T> {
+    return deleteComment<T>(this.endpoints, id)
+  }
+
+  /** Sets the authenticated account's restack state for a Note. */
+  setNoteRestack<T = unknown>(
+    id: number | string,
+    restacked: boolean,
+    options: NoteRestackOptions = {}
+  ): Promise<T> {
+    return setNoteRestack<T>(this.endpoints, id, restacked, options)
   }
 
   getPostComments(id: number | string): Promise<unknown> {
@@ -312,8 +355,11 @@ export class SubstackClient {
     })
   }
 
-  private remove<T = unknown>(path: string): Promise<T> {
-    return this.request<T>(this.globalApiBase, path, { method: 'DELETE' })
+  private remove<T = unknown>(path: string, body?: unknown): Promise<T> {
+    return this.request<T>(this.globalApiBase, path, {
+      method: 'DELETE',
+      ...(body === undefined ? {} : { body: JSON.stringify(body) })
+    })
   }
 
   private post<T = unknown>(path: string, body: unknown): Promise<T> {

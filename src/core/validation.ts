@@ -15,3 +15,12 @@ export function nonNegativeInteger(value: number | string, name: string): number
   }
   return parsed
 }
+
+export function boundedString(value: string, name: string, minimum: number, maximum: number): string {
+  if (typeof value !== 'string' || value.length < minimum || value.length > maximum) {
+    throw new SubstackConfigurationError(
+      `${name} must contain between ${minimum.toLocaleString('en-US')} and ${maximum.toLocaleString('en-US')} characters.`
+    )
+  }
+  return value
+}

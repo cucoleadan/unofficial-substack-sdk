@@ -51,7 +51,7 @@ Copy [`.dev.vars.example`](.dev.vars.example) to `.dev.vars` and replace the pla
 | `getPublicProfile(handle)` | Public profile by handle. |
 | `getProfileById(id)` | Public profile by numeric user ID. |
 | `getProfilePosts(id)` | Posts for a numeric profile ID. |
-| `getProfileNotes(id, { cursor })` | Notes feed for a numeric profile ID. |
+| `getProfileNotes(id, { cursor })` | Notes feed with `viewerHasLiked` added to each item. |
 | `getPost(id)` | Post by global Substack ID. |
 | `getPostWithEngagement(id, { includeAutomodHidden })` | Full post, visible comment tree, and calculated engagement totals. Requires `publicationUrl`. |
 | `getPostComments(id)` | Comments for a post. |
@@ -63,6 +63,10 @@ Copy [`.dev.vars.example`](.dev.vars.example) to `.dev.vars` and replace the pla
 | `getNote(id)` | Note by ID. |
 | `getComment(id)` | Comment by ID. |
 | `deleteNote(id)` | Permanently deletes an authenticated user's Note or Note draft. |
+| `setNoteLike(id, liked, options)` | Likes or unlikes a Note. |
+| `commentOnNote(id, body, options)` | Adds a plain-text comment to a Note. |
+| `deleteComment(id)` | Permanently deletes an authenticated user's comment. |
+| `setNoteRestack(id, restacked, options)` | Restacks or removes a Note restack. |
 | `getActivity(filter)` | Activity feed. Filters: `all`, `replies-and-mentions`, `restacks`. |
 | `getUnreadActivity()` | Activity feed annotated using Substack's unread count. |
 | `getFollowing()` | Accounts followed by the authenticated account. |
@@ -74,7 +78,27 @@ Copy [`.dev.vars.example`](.dev.vars.example) to `.dev.vars` and replace the pla
 | `scheduleNote(request)` | Creates a Note draft scheduled for publication at `triggerAt`. |
 | `updateScheduledNote(id, request)` | Updates a scheduled Note draft and its publication time. |
 
-The client returns upstream JSON unchanged, except `getUnreadActivity()` and `getPostWithEngagement()`, which add calculated convenience data. It exports `SubstackApiError`, `SubstackConfigurationError`, `apiBase`, `ACTIVITY_FILTERS`, and its public TypeScript types.
+The client returns upstream JSON unchanged, except `getProfileNotes()`, `getUnreadActivity()`, and `getPostWithEngagement()`, which add convenience data. It exports `SubstackApiError`, `SubstackConfigurationError`, `apiBase`, `ACTIVITY_FILTERS`, and its public TypeScript types.
+
+## Note engagement
+
+```ts
+await client.setNoteLike(302607231, true)
+await client.setNoteLike(302607231, false)
+
+const comment = await client.commentOnNote<{ id: number }>(
+  303342892,
+  'Super insightful!'
+)
+await client.deleteComment(comment.id)
+
+await client.setNoteRestack(303342892, true)
+await client.setNoteRestack(303342892, false)
+```
+
+Action methods return Substack's upstream JSON unchanged. `tabId`, `surface`, and `publicationId` have observed defaults and can be overridden through each method's options.
+
+`getProfileNotes()` adds `viewerHasLiked`: `"❤"` is `true`, an absent/false reaction is `false`, and an unknown reaction shape is `null`.
 
 ## Post engagement
 
