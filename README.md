@@ -43,6 +43,22 @@ The optional `baseUrl` and legacy `substackUrl` overrides follow the same rule. 
 
 Copy [`.dev.vars.example`](.dev.vars.example) to `.dev.vars` and replace the placeholders. The SDK does not load environment files itself; use your framework or local environment loader and pass the values into `SubstackClient`.
 
+## MCP server
+
+The package includes a read-only STDIO MCP server with tools for recent posts, email stats, post engagement, Notes, and compact content analysis. Set `SUBSTACK_SESSION_TOKEN` and `SUBSTACK_PUBLICATION_URL`, then configure Codex:
+
+```toml
+[mcp_servers.substack]
+command = "npx"
+args = ["-y", "unofficial-substack-sdk"]
+
+[mcp_servers.substack.env]
+SUBSTACK_SESSION_TOKEN = "your-substack.sid-value"
+SUBSTACK_PUBLICATION_URL = "https://your-publication.substack.com"
+```
+
+Keep the session token local and out of source control. All MCP tools are read-only.
+
 ## API
 
 | Method | Description |
