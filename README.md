@@ -51,7 +51,10 @@ The package includes a read-only STDIO MCP server with tools for recent posts, e
 [mcp_servers.substack]
 command = "npx"
 args = ["-y", "unofficial-substack-sdk"]
-env = { SUBSTACK_SESSION_TOKEN = "your-substack.sid-value", SUBSTACK_PUBLICATION_URL = "https://your-publication.substack.com" }
+
+[mcp_servers.substack.env]
+SUBSTACK_SESSION_TOKEN = "your-substack.sid-value"
+SUBSTACK_PUBLICATION_URL = "https://your-publication.substack.com"
 ```
 
 Keep the session token local and out of source control. All MCP tools are read-only.
