@@ -82,7 +82,7 @@ export function createToolHandlers(client: ReadOnlyClient) {
 }
 
 export function createMcpServer(client: ReadOnlyClient): McpServer {
-  const server = new McpServer({ name: 'substack-mcp', version: '0.1.0' })
+  const server = new McpServer({ name: 'substack-mcp', version: '0.3.0' })
   const tools = createToolHandlers(client)
 
   server.registerTool(
