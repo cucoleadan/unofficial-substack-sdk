@@ -715,6 +715,7 @@ describe('SubstackClient', () => {
         content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Updated scheduled note' }] }]
       },
       replyMinimumRole: 'everyone' as const,
+      attachmentIds: ['attachment-or-note-id'],
       triggerAt: '2026-07-17T14:01:00.000Z'
     }
 
@@ -724,6 +725,7 @@ describe('SubstackClient', () => {
     expect(await request?.json()).toEqual({
       bodyJson: note.bodyJson,
       replyMinimumRole: 'everyone',
+      attachmentIds: ['attachment-or-note-id'],
       trigger_at: '2026-07-17T14:01:00.000Z'
     })
   })

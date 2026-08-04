@@ -213,6 +213,8 @@ export interface UpdateScheduledNoteRequest {
   /** The ProseMirror-style Note document accepted by Substack's web API. */
   bodyJson: unknown
   replyMinimumRole: 'everyone'
+  /** IDs of attachments to retain on or add to the scheduled Note. */
+  attachmentIds?: string[]
   /** ISO 8601 timestamp at which Substack should publish the updated Note. */
   triggerAt: string
 }
