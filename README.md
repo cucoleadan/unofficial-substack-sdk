@@ -206,17 +206,18 @@ await client.scheduleNote({
 const drafts = await client.getDraftNotes({ limit: 20 })
 ```
 
-`deleteNote` permanently deletes a Note or Note draft. Confirm the ID before calling it.
-
-Use `updateScheduledNote` to change a scheduled draft's contents or scheduled time. It sends `triggerAt` as Substack's `trigger_at` field.
+`updateScheduledNote` updates a draft's content, publication time, and optional attachments. It sends `triggerAt` as Substack's `trigger_at` field and forwards attachment IDs from `attachmentIds`.
 
 ```ts
 await client.updateScheduledNote(289737400, {
-  bodyJson: { type: 'doc', attrs: { schemaVersion: 'v1', title: null }, content: [] },
+  bodyJson: { type: 'doc', attrs: { schemaVersion: 'v1' }, content: [] },
   replyMinimumRole: 'everyone',
-  triggerAt: '2026-07-17T14:01:00.000Z'
+  attachmentIds: ['attachment-or-note-id'],
+  triggerAt: '2026-07-18T08:12:00.000Z'
 })
 ```
+
+`deleteNote` permanently deletes a Note or Note draft. Confirm the ID before calling it.
 
 ```ts
 await client.deleteNote(296235019)
