@@ -187,6 +187,48 @@ export interface UploadedImage {
   imageHeight: number
 }
 
+/** A person whose explicit `@Display Name` occurrence should become a Note tag. */
+export interface NotePersonTag {
+  /** Substack user ID stored in the mention node. */
+  id: number | string
+  /** Display label without the leading `@`. */
+  label: string
+  /** Optional profile URL stored by Substack. Defaults to null. */
+  url?: string | null
+}
+
+export interface NoteBodyTextNode {
+  type: 'text'
+  text: string
+}
+
+export interface NotePersonTagNode {
+  type: 'substack_mention'
+  attrs: {
+    id: number
+    label: string
+    mentionType: 'user'
+    url: string | null
+  }
+}
+
+export type NoteBodyInlineNode = NoteBodyTextNode | NotePersonTagNode
+
+export interface NoteBodyParagraphNode {
+  type: 'paragraph'
+  content: NoteBodyInlineNode[]
+}
+
+/** Note document produced by createNoteBodyJson. */
+export interface NoteBodyJson {
+  type: 'doc'
+  attrs: {
+    schemaVersion: 'v1'
+    title: null
+  }
+  content: NoteBodyParagraphNode[]
+}
+
 /**
  * Payload for publishing a Note.
  *
