@@ -187,11 +187,13 @@ export interface UploadedImage {
   imageHeight: number
 }
 
-/** A person whose explicit `@Display Name` occurrence should become a Note tag. */
+/** A person whose explicit `@handle` occurrence should become a Note tag. */
 export interface NotePersonTag {
   /** Substack user ID stored in the mention node. */
   id: number | string
-  /** Display label without the leading `@`. */
+  /** Public handle matched in the Note body, with or without the leading `@`. */
+  handle?: string
+  /** Display name stored in the mention node. */
   label: string
   /** Optional profile URL stored by Substack. Defaults to null. */
   url?: string | null

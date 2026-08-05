@@ -654,8 +654,8 @@ describe('SubstackClient', () => {
   })
 
   test('builds person-tagged Note bodies without losing surrounding text', () => {
-    const bodyJson = createNoteBodyJson('Thanks @Mia Kiraki 🎭!', [
-      { id: '362428399', label: 'Mia Kiraki 🎭' }
+    const bodyJson = createNoteBodyJson('Thanks @dancn!', [
+      { id: '44242110', handle: '@dancn', label: 'Dan Cucolea' }
     ])
 
     expect(bodyJson.content[0]?.content).toEqual([
@@ -663,8 +663,8 @@ describe('SubstackClient', () => {
       {
         type: 'substack_mention',
         attrs: {
-          id: 362428399,
-          label: 'Mia Kiraki 🎭',
+          id: 44242110,
+          label: 'Dan Cucolea',
           mentionType: 'user',
           url: null
         }
@@ -672,7 +672,9 @@ describe('SubstackClient', () => {
       { type: 'text', text: '!' }
     ])
     expect(() =>
-      createNoteBodyJson('No matching tag', [{ id: 362428399, label: 'Mia Kiraki 🎭' }])
+      createNoteBodyJson('No matching tag', [
+        { id: 44242110, handle: 'dancn', label: 'Dan Cucolea' }
+      ])
     ).toThrow(SubstackConfigurationError)
   })
 
@@ -699,8 +701,8 @@ describe('SubstackClient', () => {
       }
     })
     const note = {
-      bodyJson: createNoteBodyJson('@Mia Kiraki 🎭', [
-        { id: 362428399, label: 'Mia Kiraki 🎭' }
+      bodyJson: createNoteBodyJson('@dancn', [
+        { id: 44242110, handle: 'dancn', label: 'Dan Cucolea' }
       ]),
       tabId: 'subscribed',
       surface: 'feed',
@@ -724,8 +726,8 @@ describe('SubstackClient', () => {
                   {
                     type: 'substack_mention',
                     attrs: {
-                      id: 362428399,
-                      label: 'Mia Kiraki 🎭',
+                      id: 44242110,
+                      label: 'Dan Cucolea',
                       mentionType: 'user',
                       url: null
                     }

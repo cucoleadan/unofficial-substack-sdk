@@ -184,12 +184,12 @@ await client.publishNote({
 
 `scheduleNote` creates a server-side draft and schedules it for publication. Pass an ISO 8601 timestamp as `triggerAt`; the SDK sends it to Substack as `trigger_at`.
 
-Use `createNoteBodyJson` to turn explicit `@Display Name` occurrences into Substack person-tag nodes. Each tag needs the person's Substack user ID and a label without the leading `@`.
+Use `createNoteBodyJson` to turn explicit `@handle` occurrences into Substack person-tag nodes. Each tag needs the person's public Substack user ID, handle, and display name.
 
 ```ts
 await client.scheduleNote({
-  bodyJson: createNoteBodyJson('Scheduled note for @Mia Kiraki 🎭', [
-    { id: 362428399, label: 'Mia Kiraki 🎭' }
+  bodyJson: createNoteBodyJson('Scheduled note for @dancn', [
+    { id: 44242110, handle: 'dancn', label: 'Dan Cucolea' }
   ]),
   tabId: 'subscribed',
   surface: 'feed',

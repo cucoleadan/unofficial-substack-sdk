@@ -11,6 +11,7 @@ const MAX_NOTE_LENGTH = 5_000
 const MAX_PERSON_TAG_LABEL_LENGTH = 500
 
 type NormalizedPersonTag = {
+  handle: string
   id: number
   label: string
   token: string
@@ -26,22 +27,30 @@ function normalizePersonTags(personTags: readonly NotePersonTag[]): NormalizedPe
       MAX_PERSON_TAG_LABEL_LENGTH
     )
 
+    const handle = boundedString(
+      tag.handle?.replace(/^@/, '') ?? label,
+      'Note person tag handle',
+      1,
+      MAX_PERSON_TAG_LABEL_LENGTH
+    )
+
     return {
+      handle,
       id: positiveInteger(tag.id, 'Note person tag ID'),
       label,
-      token: `@${label}`,
+      token: `@${handle}`,
       url: tag.url ?? null
     }
   })
 
-  const labels = new Set<string>()
+  const handles = new Set<string>()
   for (const tag of tags) {
-    if (labels.has(tag.label)) {
+    if (handles.has(tag.handle)) {
       throw new SubstackConfigurationError(
-        `Note person tag label "${tag.label}" must be unique.`
+        `Note person tag handle "@${tag.handle}" must be unique.`
       )
     }
-    labels.add(tag.label)
+    handles.add(tag.handle)
   }
 
   return tags
@@ -62,7 +71,7 @@ function personTagNode(tag: NormalizedPersonTag): NotePersonTagNode {
 function parseInlineContent(
   body: string,
   personTags: readonly NormalizedPersonTag[],
-  matchedLabels: Set<string>
+  matchedHandles: Set<string>
 ): NoteBodyInlineNode[] {
   const content: NoteBodyInlineNode[] = []
   let cursor = 0
@@ -94,7 +103,7 @@ function parseInlineContent(
     }
 
     content.push(personTagNode(nextTag))
-    matchedLabels.add(nextTag.label)
+    matchedHandles.add(nextTag.handle)
     cursor = nextIndex + nextTag.token.length
   }
 
@@ -103,7 +112,7 @@ function parseInlineContent(
 
 /**
  * Builds Substack's ProseMirror-style Note document and converts explicitly
- * supplied `@Display Name` occurrences into person-tag nodes.
+ * supplied `@handle` occurrences into person-tag nodes.
  */
 export function createNoteBodyJson(
   body: string,
@@ -111,14 +120,14 @@ export function createNoteBodyJson(
 ): NoteBodyJson {
   const validatedBody = boundedString(body, 'Note body', 1, MAX_NOTE_LENGTH)
   const tags = normalizePersonTags(personTags)
-  const matchedLabels = new Set<string>()
+  const matchedHandles = new Set<string>()
   const paragraphs = validatedBody.split(/\r?\n/).map((paragraph) => ({
     type: 'paragraph' as const,
-    content: parseInlineContent(paragraph, tags, matchedLabels)
+    content: parseInlineContent(paragraph, tags, matchedHandles)
   }))
 
   for (const tag of tags) {
-    if (!matchedLabels.has(tag.label)) {
+    if (!matchedHandles.has(tag.handle)) {
       throw new SubstackConfigurationError(
         `Note body must contain the person tag "${tag.token}".`
       )
