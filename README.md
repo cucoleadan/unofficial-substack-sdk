@@ -15,7 +15,7 @@ bun add unofficial-substack-sdk
 ## Quick start
 
 ```ts
-import { SubstackClient } from 'unofficial-substack-sdk'
+import { createNoteBodyJson, SubstackClient } from 'unofficial-substack-sdk'
 
 const client = new SubstackClient({
   sessionToken: process.env.SUBSTACK_SESSION_TOKEN!,
@@ -184,13 +184,13 @@ await client.publishNote({
 
 `scheduleNote` creates a server-side draft and schedules it for publication. Pass an ISO 8601 timestamp as `triggerAt`; the SDK sends it to Substack as `trigger_at`.
 
+Use `createNoteBodyJson` to turn explicit `@handle` occurrences into Substack person-tag nodes. Each tag needs the person's public Substack user ID, handle, and display name.
+
 ```ts
 await client.scheduleNote({
-  bodyJson: {
-    type: 'doc',
-    attrs: { schemaVersion: 'v1', title: null },
-    content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Scheduled note' }] }]
-  },
+  bodyJson: createNoteBodyJson('Scheduled note for @dancn', [
+    { id: 44242110, handle: 'dancn', label: 'Dan Cucolea' }
+  ]),
   tabId: 'subscribed',
   surface: 'feed',
   replyMinimumRole: 'everyone',

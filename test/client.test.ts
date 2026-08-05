@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   apiBase,
+  createNoteBodyJson,
   SubstackApiError,
   SubstackClient,
   SubstackConfigurationError
@@ -652,6 +653,31 @@ describe('SubstackClient', () => {
     ])
   })
 
+  test('builds person-tagged Note bodies without losing surrounding text', () => {
+    const bodyJson = createNoteBodyJson('Thanks @dancn!', [
+      { id: '44242110', handle: '@dancn', label: 'Dan Cucolea' }
+    ])
+
+    expect(bodyJson.content[0]?.content).toEqual([
+      { type: 'text', text: 'Thanks ' },
+      {
+        type: 'substack_mention',
+        attrs: {
+          id: 44242110,
+          label: 'Dan Cucolea',
+          mentionType: 'user',
+          url: null
+        }
+      },
+      { type: 'text', text: '!' }
+    ])
+    expect(() =>
+      createNoteBodyJson('No matching tag', [
+        { id: 44242110, handle: 'dancn', label: 'Dan Cucolea' }
+      ])
+    ).toThrow(SubstackConfigurationError)
+  })
+
   test('schedules a Note through the global draft endpoint', async () => {
     const calls: Array<{ method: string; url: string; body: unknown }> = []
     const scheduledDraft = {
@@ -675,7 +701,9 @@ describe('SubstackClient', () => {
       }
     })
     const note = {
-      bodyJson: { type: 'doc', attrs: { schemaVersion: 'v1', title: null }, content: [] },
+      bodyJson: createNoteBodyJson('@dancn', [
+        { id: 44242110, handle: 'dancn', label: 'Dan Cucolea' }
+      ]),
       tabId: 'subscribed',
       surface: 'feed',
       replyMinimumRole: 'everyone' as const,
@@ -688,7 +716,26 @@ describe('SubstackClient', () => {
         method: 'POST',
         url: 'https://substack.com/api/v1/comment/draft',
         body: {
-          bodyJson: note.bodyJson,
+          bodyJson: {
+            type: 'doc',
+            attrs: { schemaVersion: 'v1', title: null },
+            content: [
+              {
+                type: 'paragraph',
+                content: [
+                  {
+                    type: 'substack_mention',
+                    attrs: {
+                      id: 44242110,
+                      label: 'Dan Cucolea',
+                      mentionType: 'user',
+                      url: null
+                    }
+                  }
+                ]
+              }
+            ]
+          },
           tabId: 'subscribed',
           surface: 'feed',
           replyMinimumRole: 'everyone',

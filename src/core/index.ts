@@ -1,5 +1,6 @@
 export { apiBase, isActivityFilter, SubstackClient } from './client.js'
 export { SubstackApiError, SubstackConfigurationError } from './errors.js'
+export { createNoteBodyJson } from './note-body.js'
 export {
   ACTIVITY_FILTERS,
   type ActivityFeed,
@@ -14,8 +15,14 @@ export {
   type EmailStatsPage,
   type FetchLike,
   type NoteActionOptions,
+  type NoteBodyInlineNode,
+  type NoteBodyJson,
+  type NoteBodyParagraphNode,
+  type NoteBodyTextNode,
   type NoteCommentOptions,
   type NoteLikeOptions,
+  type NotePersonTag,
+  type NotePersonTagNode,
   type NoteRepliesResponse,
   type NoteRestackOptions,
   type PostEngagement,
