@@ -3,6 +3,9 @@ import { describe, expect, test } from 'bun:test'
 import {
   apiBase,
   createNoteBodyJson,
+  type EmailStatsRow,
+  type NoteEngagement,
+  type PostManagementDetail,
   SubstackApiError,
   SubstackClient,
   SubstackConfigurationError
@@ -175,6 +178,63 @@ describe('SubstackClient', () => {
     expect(fetchCalled).toBe(false)
   })
 
+  test('gets typed post-management detail for numeric and string IDs without changing the response', async () => {
+    const requests: string[] = []
+    const response = {
+      posts: [
+        {
+          id: 123,
+          reaction_count: 9,
+          comment_count: 2,
+          child_comment_count: 1,
+          stats: {
+            delivered: 500,
+            opens: 162,
+            clicks: 3,
+            likes: 9,
+            comments: 2,
+            shares: 4,
+            restacks: 1,
+            views: 169
+          }
+        }
+      ],
+      total: 1
+    } satisfies PostManagementDetail
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://newsletter.example.com',
+      fetch: async (input) => {
+        requests.push(new Request(input).url)
+        return Response.json(response)
+      }
+    })
+
+    await expect(client.getPostManagementDetail(123)).resolves.toEqual(response)
+    await expect(client.getPostManagementDetail('456')).resolves.toEqual(response)
+    expect(requests).toEqual([
+      'https://newsletter.example.com/api/v1/post_management/detail/123',
+      'https://newsletter.example.com/api/v1/post_management/detail/456'
+    ])
+    expect(() => client.getPostManagementDetail(0)).toThrow(SubstackConfigurationError)
+    expect(() => client.getPostManagementDetail('not-an-id')).toThrow(SubstackConfigurationError)
+  })
+
+  test('surfaces post-management upstream errors with the requested URL', async () => {
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://newsletter.example.com',
+      fetch: async () => Response.json({ error: 'forbidden' }, { status: 403 })
+    })
+
+    await expect(client.getPostManagementDetail(123)).rejects.toMatchObject({
+      name: SubstackApiError.name,
+      status: 403,
+      url: 'https://newsletter.example.com/api/v1/post_management/detail/123',
+      detail: '{"error":"forbidden"}'
+    })
+  })
+
   test('uses a supplied custom domain for publication-scoped requests', async () => {
     let request: Request | undefined
     const client = new SubstackClient({
@@ -231,43 +291,69 @@ describe('SubstackClient', () => {
     expect(request?.url).toBe('https://allagentsconsidered.substack.com/api/v1/notes?cursor=next%20page')
   })
 
-  test('annotates profile Notes with the authenticated viewer like state', async () => {
+  test('returns typed profile Notes without changing the upstream response', async () => {
     let request: Request | undefined
-    const client = new SubstackClient({
+    const response = {
+      items: [
+        { comment: { id: 1, reaction: '❤', reaction_count: 11, restacks: 3, restacked: true } },
+        { comment: { id: 2, reaction_count: 10, children_count: 4 } },
+        { context: { type: 'note' } }
+      ],
+      nextCursor: null
+    }
+    const passthroughClient = new SubstackClient({
       sessionToken: 'session-value',
       publicationUrl: 'https://allagentsconsidered.substack.com',
       fetch: async (input, init) => {
         request = new Request(input, init)
-        return Response.json({
-          items: [
-            { comment: { id: 1, reaction: '❤', reaction_count: 11 } },
-            { comment: { id: 2, reaction_count: 10 } },
-            { comment: { id: 3, reaction: false } },
-            { comment: { id: 4, reaction: 'unexpected' } },
-            { context: { type: 'note' } }
-          ],
-          nextCursor: null
-        })
+        return Response.json(response)
       }
     })
 
-    await expect(client.getProfileNotes(7)).resolves.toEqual({
-      items: [
-        { comment: { id: 1, reaction: '❤', reaction_count: 11 }, viewerHasLiked: true },
-        { comment: { id: 2, reaction_count: 10 }, viewerHasLiked: false },
-        { comment: { id: 3, reaction: false }, viewerHasLiked: false },
-        { comment: { id: 4, reaction: 'unexpected' }, viewerHasLiked: null },
-        { context: { type: 'note' }, viewerHasLiked: null }
-      ],
-      nextCursor: null
-    })
+    const page = await passthroughClient.getProfileNotes(7)
+    expect(page).toEqual(response)
+    expect(page.items?.[0]?.comment?.restacks).toBe(3)
     expect(request?.url).toBe(
       'https://allagentsconsidered.substack.com/api/v1/reader/feed/profile/7?types=note'
     )
   })
 
+  test('gets a typed Note by numeric or string ID without changing the response', async () => {
+    const requests: string[] = []
+    const response = {
+      item: {
+        comment: {
+          id: 300750684,
+          reaction_count: 11,
+          children_count: 2,
+          restacks: 3,
+          reaction: null,
+          restacked: false
+        }
+      }
+    }
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://newsletter.example.com',
+      fetch: async (input) => {
+        requests.push(new Request(input).url)
+        return Response.json(response)
+      }
+    })
+
+    const note = await client.getNote(300750684)
+    expect(note).toEqual(response)
+    expect(note.item?.comment?.children_count).toBe(2)
+    await expect(client.getNote('300750684')).resolves.toEqual(response)
+    expect(requests).toEqual([
+      'https://newsletter.example.com/api/v1/reader/comment/300750684',
+      'https://newsletter.example.com/api/v1/reader/comment/300750684'
+    ])
+    expect(() => client.getNote(-1)).toThrow(SubstackConfigurationError)
+  })
+
   test('gets Note reply branches through the global reader endpoint', async () => {
-    let request: Request | undefined
+    const requests: Request[] = []
     const response = {
       commentBranches: [{ comment: { id: 300751001 }, descendantComments: [] }],
       moreBranches: 0,
@@ -278,18 +364,141 @@ describe('SubstackClient', () => {
     const client = new SubstackClient({
       sessionToken: 'session-value',
       fetch: async (input, init) => {
-        request = new Request(input, init)
+        requests.push(new Request(input, init))
         return Response.json(response)
       }
     })
 
     await expect(client.getNoteReplies(300750684)).resolves.toEqual(response)
-    expect(request?.method).toBe('GET')
-    expect(request?.url).toBe(
-      'https://substack.com/api/v1/reader/comment/300750684/replies?comment_id=300750684'
-    )
-    expect(request?.headers.get('cookie')).toBe('substack.sid=session-value')
+    await expect(client.getNoteReplies('300750684', { cursor: 'next page' })).resolves.toEqual(response)
+    expect(requests.map((request) => request.url)).toEqual([
+      'https://substack.com/api/v1/reader/comment/300750684/replies?comment_id=300750684',
+      'https://substack.com/api/v1/reader/comment/300750684/replies?comment_id=300750684&cursor=next+page'
+    ])
+    expect(requests.every((request) => request.method === 'GET')).toBe(true)
+    expect(requests[0]?.headers.get('cookie')).toBe('substack.sid=session-value')
     expect(() => client.getNoteReplies(0)).toThrow(SubstackConfigurationError)
+  })
+
+  test('calculates complete visible direct and nested Note reply totals across pages', async () => {
+    const requests: string[] = []
+    const note = {
+      item: {
+        comment: {
+          id: 10,
+          reaction: '❤',
+          reaction_count: 7,
+          children_count: 3,
+          restacks: 2,
+          restacked: true
+        }
+      }
+    }
+    const firstPage = {
+      commentBranches: [
+        {
+          comment: { id: 11, children_count: 2 },
+          descendantComments: [{ comment: { id: 12 } }, { comment: { id: 13 } }]
+        },
+        {
+          comment: { id: 14, children_count: 1 },
+          descendantComments: [{ comment: { id: 15 } }]
+        }
+      ],
+      moreBranches: 1,
+      nextCursor: 'next page',
+      rootComment: { id: 10 },
+      automodHiddenBranches: []
+    }
+    const secondPage = {
+      commentBranches: [{ comment: { id: 16, children_count: 0 }, descendantComments: [] }],
+      moreBranches: 0,
+      nextCursor: null,
+      rootComment: { id: 10 }
+    }
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://newsletter.example.com',
+      fetch: async (input) => {
+        const url = new Request(input).url
+        requests.push(url)
+        if (url === 'https://newsletter.example.com/api/v1/reader/comment/10') {
+          return Response.json(note)
+        }
+        return Response.json(url.includes('cursor=next+page') ? secondPage : firstPage)
+      }
+    })
+
+    const result = await client.getNoteWithEngagement('10')
+    const engagement: NoteEngagement = result.engagement
+
+    expect(requests).toEqual([
+      'https://newsletter.example.com/api/v1/reader/comment/10',
+      'https://substack.com/api/v1/reader/comment/10/replies?comment_id=10',
+      'https://substack.com/api/v1/reader/comment/10/replies?comment_id=10&cursor=next+page'
+    ])
+    expect(result.note).toEqual(note)
+    expect(result.replyPages).toEqual([firstPage, secondPage])
+    expect(result.replies.map((branch) => branch.comment?.id)).toEqual([11, 14, 16])
+    expect(engagement).toEqual({
+      reactionCount: 7,
+      reportedDirectReplyCount: 3,
+      directReplyCount: 3,
+      nestedReplyCount: 3,
+      totalReplyCount: 6,
+      restackCount: 2,
+      viewerHasLiked: true,
+      viewerHasRestacked: true,
+      replyCountsComplete: true
+    })
+    expect(engagement).not.toHaveProperty('viewCount')
+  })
+
+  test('omits unreliable Note totals when optional reply structures are missing', async () => {
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://newsletter.example.com',
+      fetch: async (input) => Response.json(
+        new Request(input).url.includes('/replies')
+          ? { commentBranches: [{ comment: { id: 2 } }], nextCursor: null }
+          : { item: { comment: { id: 1, reaction: null, restacked: false } } }
+      )
+    })
+
+    const result = await client.getNoteWithEngagement(1)
+    expect(result.engagement).toMatchObject({
+      viewerHasLiked: false,
+      viewerHasRestacked: false,
+      replyCountsComplete: false
+    })
+    expect(result.engagement).not.toHaveProperty('reactionCount')
+    expect(result.engagement).not.toHaveProperty('directReplyCount')
+    expect(result.engagement).not.toHaveProperty('nestedReplyCount')
+    expect(result.engagement).not.toHaveProperty('totalReplyCount')
+    expect(result.engagement).not.toHaveProperty('restackCount')
+    expect(result.engagement).not.toHaveProperty('viewCount')
+  })
+
+  test('validates Note engagement IDs and publication scope before requesting data', async () => {
+    let fetchCalled = false
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async () => {
+        fetchCalled = true
+        return Response.json({})
+      }
+    })
+
+    expect(() => client.getNoteWithEngagement(1)).toThrow(SubstackConfigurationError)
+    expect(fetchCalled).toBe(false)
+
+    const publicationClient = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://newsletter.example.com'
+    })
+    await expect(publicationClient.getNoteWithEngagement('invalid')).rejects.toBeInstanceOf(
+      SubstackConfigurationError
+    )
   })
 
   test('gets reply and mention activity through the global activity endpoint', async () => {
@@ -309,33 +518,45 @@ describe('SubstackClient', () => {
 
   test('gets publication email stats using the dashboard defaults and supplied query options', async () => {
     const requests: Request[] = []
+    const row = {
+      post_id: 123,
+      delivered: 500,
+      opens: 162,
+      clicks: 3,
+      likes: 9,
+      comments: 2,
+      shares: 4,
+      restacks: 1
+    } satisfies EmailStatsRow
+    const response = { rows: [row], total: 1 }
     const client = new SubstackClient({
       sessionToken: 'session-value',
       publicationUrl: 'https://allagentsconsidered.substack.com',
       fetch: async (input, init) => {
         const request = new Request(input, init)
         requests.push(request)
-        return Response.json({ rows: [] })
+        return Response.json(response)
       }
     })
 
-    await client.getEmailStats()
+    const page = await client.getEmailStats()
+    expect(page).toEqual(response)
+    expect(page.rows?.[0]?.restacks).toBe(1)
     await client.getEmailStats({ offset: 20, limit: 50, orderBy: 'opens', orderDirection: 'asc' })
 
     expect(requests.map((request) => request.url)).toEqual([
       'https://allagentsconsidered.substack.com/api/v1/publication/stats/email_stats?offset=0&limit=20&order_by=post_date&order_direction=desc',
-      'https://allagentsconsidered.substack.com/api/v1/publication/stats/email_stats?offset=20&limit=50&order_by=opens&order_direction=asc'
+      'https://allagentsconsidered.substack.com/api/v1/publication/stats/email_stats?offset=20&limit=20&order_by=opens&order_direction=asc'
     ])
   })
 
-  test('validates email stats pagination values', () => {
+  test('validates the email stats offset', () => {
     const client = new SubstackClient({
       sessionToken: 'session-value',
       publicationUrl: 'https://allagentsconsidered.substack.com'
     })
 
     expect(() => client.getEmailStats({ offset: -1 })).toThrow(SubstackConfigurationError)
-    expect(() => client.getEmailStats({ limit: 0 })).toThrow(SubstackConfigurationError)
   })
 
   test('collects every email stats page into one array', async () => {
@@ -359,9 +580,9 @@ describe('SubstackClient', () => {
       client.getAllEmailStats<{ post_id: number }>({ limit: 2, orderBy: 'opens', orderDirection: 'asc' })
     ).resolves.toEqual([{ post_id: 1 }, { post_id: 2 }, { post_id: 3 }])
     expect(requests).toEqual([
-      'https://allagentsconsidered.substack.com/api/v1/publication/stats/email_stats?offset=0&limit=2&order_by=opens&order_direction=asc',
-      'https://allagentsconsidered.substack.com/api/v1/publication/stats/email_stats?offset=2&limit=2&order_by=opens&order_direction=asc',
-      'https://allagentsconsidered.substack.com/api/v1/publication/stats/email_stats?offset=3&limit=2&order_by=opens&order_direction=asc'
+      'https://allagentsconsidered.substack.com/api/v1/publication/stats/email_stats?offset=0&limit=20&order_by=opens&order_direction=asc',
+      'https://allagentsconsidered.substack.com/api/v1/publication/stats/email_stats?offset=2&limit=20&order_by=opens&order_direction=asc',
+      'https://allagentsconsidered.substack.com/api/v1/publication/stats/email_stats?offset=3&limit=20&order_by=opens&order_direction=asc'
     ])
   })
 

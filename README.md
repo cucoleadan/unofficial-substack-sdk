@@ -29,7 +29,7 @@ const notes = await client.getNotes()
 
 `sessionToken` is the value of the `substack.sid` cookie only: do not pass `substack.sid=` or a complete `Cookie` header. Store it only in trusted server-side environment variables—never expose it in browser code, client bundles, issues, or logs.
 
-`publicationUrl` is required for publication-scoped methods such as `getNotes`, `getNote`, `getComment`, `getPostComments`, `getEmailStats`, `getSubscriberStats`, `getProfileNotes`, and `getFollowing`. It accepts any HTTPS publication domain (including a custom domain) or a copied browser URL; query strings and fragments are discarded safely.
+`publicationUrl` is required for publication-scoped methods such as `getNotes`, `getNote`, `getNoteWithEngagement`, `getComment`, `getPostComments`, `getPostManagementDetail`, `getEmailStats`, `getSubscriberStats`, `getProfileNotes`, and `getFollowing`. It accepts any HTTPS publication domain (including a custom domain) or a copied browser URL; query strings and fragments are discarded safely.
 
 ## Direct Substack requests only
 
@@ -67,16 +67,18 @@ Keep the session token local and out of source control. All MCP tools are read-o
 | `getPublicProfile(handle)` | Public profile by handle. |
 | `getProfileById(id)` | Public profile by numeric user ID. |
 | `getProfilePosts(id)` | Posts for a numeric profile ID. |
-| `getProfileNotes(id, { cursor })` | Notes feed with `viewerHasLiked` added to each item. |
+| `getProfileNotes(id, { cursor })` | Raw, typed profile Notes feed. |
 | `getPost(id)` | Post by global Substack ID. |
+| `getPostManagementDetail(id)` | Raw, typed author analytics for one Post. Requires `publicationUrl` and publication access. |
 | `getPostWithEngagement(id, { includeAutomodHidden })` | Full post, visible comment tree, and calculated engagement totals. Requires `publicationUrl`. |
 | `getPostComments(id)` | Comments for a post. |
-| `getEmailStats({ offset, limit, orderBy, orderDirection })` | Publication email delivery and engagement stats. Defaults: `0`, `20`, `post_date`, `desc`. Requires a publication administrator session. |
-| `getAllEmailStats({ offset, limit, orderBy, orderDirection })` | Fetches every email-stat page and returns one flat array of rows. |
+| `getEmailStats({ offset, orderBy, orderDirection })` | Publication email delivery and engagement stats. Uses Substack's required fixed page size of 20. Requires a publication administrator session. |
+| `getAllEmailStats({ offset, orderBy, orderDirection })` | Fetches every 20-row email-stat page and returns one flat array of rows. |
 | `getSubscriberStats()` | Publication subscriber records and aggregate count. The response may contain subscriber personal data. |
 | `getNotes({ cursor })` | Authenticated publication Notes feed. |
 | `getDraftNotes({ limit })` | Scheduled Note drafts for the authenticated account. Defaults to 20. |
-| `getNote(id)` | Note by ID. |
+| `getNote(id)` | Raw, typed Note by ID. |
+| `getNoteWithEngagement(id)` | Raw Note and reply pages plus normalized, fully paginated visible reply totals. |
 | `getComment(id)` | Comment by ID. |
 | `getNoteReplies(id)` | Reply branches, root Note, and pagination metadata for a Note. |
 | `deleteNote(id)` | Permanently deletes an authenticated user's Note or Note draft. |
@@ -95,7 +97,7 @@ Keep the session token local and out of source control. All MCP tools are read-o
 | `scheduleNote(request)` | Creates a Note draft scheduled for publication at `triggerAt`. |
 | `updateScheduledNote(id, request)` | Updates a scheduled Note draft and its publication time. |
 
-The client returns upstream JSON unchanged, except `getProfileNotes()`, `getUnreadActivity()`, and `getPostWithEngagement()`, which add convenience data. It exports `SubstackApiError`, `SubstackConfigurationError`, `apiBase`, `ACTIVITY_FILTERS`, and its public TypeScript types.
+Ordinary endpoint methods, including `getEmailStats()`, `getPostManagementDetail()`, `getNote()`, `getProfileNotes()`, and `getNoteReplies()`, return upstream JSON unchanged. Explicit convenience methods such as `getPostWithEngagement()`, `getNoteWithEngagement()`, and `getUnreadActivity()` add or normalize data. The package exports `SubstackApiError`, `SubstackConfigurationError`, `apiBase`, `ACTIVITY_FILTERS`, and its public TypeScript types. See [Engagement analytics API](docs/engagement-analytics.md) for the observed response structures and field semantics.
 
 ## Note engagement
 
@@ -115,7 +117,22 @@ await client.setNoteRestack(303342892, false)
 
 Action methods return Substack's upstream JSON unchanged. `tabId`, `surface`, and `publicationId` have observed defaults and can be overridden through each method's options.
 
-`getProfileNotes()` adds `viewerHasLiked`: `"❤"` is `true`, an absent/false reaction is `false`, and an unknown reaction shape is `null`.
+`getNote()`, `getProfileNotes()`, and `getNoteReplies()` return Substack's JSON unchanged with typed Note, feed-item, reply-branch, and pagination structures. Current Note engagement is carried by the Note's `comment` object:
+
+| Metric | Confirmed raw field |
+| --- | --- |
+| Likes/reactions | `reaction_count` (`reactions` contains the per-reaction map) |
+| Direct replies | `children_count` |
+| Nested replies | No scalar field; aggregate each reply branch's `descendantComments` across all cursor pages |
+| Total replies | Direct branches plus all `descendantComments` after complete pagination |
+| Restacks | `restacks` |
+| Viewer liked | `reaction === "❤"` |
+| Viewer restacked | `restacked` |
+| Views | Not present in the observed Note, profile-Note, or Note-reply responses |
+
+`getNoteWithEngagement(id)` fetches the Note and follows every `getNoteReplies()` cursor. It returns the unchanged Note in `note`, unchanged pages in `replyPages`, flattened visible direct branches in `replies`, and a `NoteEngagement` object. `directReplyCount`, `nestedReplyCount`, and `totalReplyCount` are included only when all pages and branch arrays can be aggregated safely; `replyCountsComplete` states whether that calculation was reliable. Automoderated branches remain separate in the raw pages and are not mixed into visible totals.
+
+The candidate fields `comment_count`, `reply_count`, `child_comment_count`, `descendant_comment_count`, `viewer_has_liked`, and `viewer_has_restacked` were not present on the audited Note objects. They remain optional in `NoteComment` for forward-compatible raw typing. Current viewer state comes from `reaction` and `restacked`.
 
 ## Post engagement
 
@@ -129,6 +146,32 @@ const result = await client.getPostWithEngagement(193463596, {
 console.log(result.engagement.visibleCommentCount)
 console.log(result.commentItems)
 console.log(result.automodHiddenComments)
+```
+
+Author analytics are available separately through `getEmailStats()` and `getPostManagementDetail(id)`. The first returns `{ rows, total }`; the second returns `{ posts, total }`, with the requested Post's analytics under `posts[0].stats`. Both responses expose the same confirmed engagement names:
+
+The email-stats endpoint requires `limit=20`; larger values currently return HTTP 400. The SDK therefore always sends 20 for `getEmailStats()` and every `getAllEmailStats()` page. The legacy `limit` option remains in the TypeScript interface for source compatibility but is deprecated and ignored.
+
+| Metric | Confirmed raw field |
+| --- | --- |
+| Deliveries | `delivered` |
+| Opens | `opens` |
+| Clicks | `clicks` |
+| Likes | `likes` |
+| Comments | `comments` |
+| Shares | `shares` |
+| Restacks | `restacks` |
+| Views | `views` |
+
+`shares` and `restacks` are separate upstream counters. `opened` and `clicked` also appear alongside `opens` and `clicks`; consumers should preserve those raw fields rather than assuming undocumented equivalence. `getPostManagementDetail()` can additionally return link-level click tuples in `posts[].stats.links`.
+
+```ts
+const emailPage = await client.getEmailStats()
+const detail = await client.getPostManagementDetail(193463596)
+
+console.log(emailPage.rows?.[0]?.shares)
+console.log(emailPage.rows?.[0]?.restacks)
+console.log(detail.posts?.[0]?.stats?.delivered)
 ```
 
 ## Replies and mentions

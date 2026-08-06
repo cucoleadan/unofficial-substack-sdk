@@ -9,11 +9,19 @@ import type {
   DraftNotesPage,
   EmailStatsOptions,
   EmailStatsPage,
+  EmailStatsRow,
   FetchLike,
+  NoteComment,
   NoteCommentOptions,
+  NoteFeedItem,
   NoteLikeOptions,
+  NoteReplyBranch,
   NoteRepliesResponse,
+  NoteResponse,
   NoteRestackOptions,
+  NoteWithEngagement,
+  PostManagementDetail,
+  PostManagementPost,
   PostWithEngagement,
   PostWithEngagementOptions,
   ProfileNotesPage,
@@ -37,6 +45,7 @@ import {
   getComment,
   getDraftNotes,
   getNote,
+  getNoteWithEngagement,
   getNoteReplies,
   getNotes,
   getPostComments,
@@ -48,7 +57,7 @@ import {
   uploadImage,
   updateScheduledNote
 } from '../resources/notes/index.js'
-import { getPost, getPostWithEngagement } from '../resources/posts/index.js'
+import { getPost, getPostManagementDetail, getPostWithEngagement } from '../resources/posts/index.js'
 import {
   getAuthenticatedProfile,
   getFollowing,
@@ -157,6 +166,13 @@ export class SubstackClient {
     return getPost(this.endpoints, id)
   }
 
+  /** Returns raw author analytics detail for one post from the publication origin. */
+  getPostManagementDetail<TPost = PostManagementPost>(
+    id: string | number
+  ): Promise<PostManagementDetail<TPost>> {
+    return getPostManagementDetail<TPost>(this.endpoints, id)
+  }
+
   /**
    * Returns a full post, its visible comment tree, and calculated engagement
    * totals. A publication URL is required to retrieve post comments.
@@ -182,15 +198,21 @@ export class SubstackClient {
     return getDraftNotes<T>(this.endpoints, options)
   }
 
-  getProfileNotes<T extends Record<string, unknown> = Record<string, unknown>>(
+  getProfileNotes<T extends Record<string, unknown> = NoteFeedItem>(
     id: number | string,
     options: CursorOptions = {}
   ): Promise<ProfileNotesPage<T>> {
     return getProfileNotes<T>(this.endpoints, id, options)
   }
 
-  getNote(id: number | string): Promise<unknown> {
-    return getNote(this.endpoints, id)
+  getNote<T = NoteResponse>(id: number | string): Promise<T> {
+    return getNote<T>(this.endpoints, id)
+  }
+
+  /** Returns a raw Note, every raw reply page, and reliable normalized engagement totals. */
+  getNoteWithEngagement(id: number | string): Promise<NoteWithEngagement> {
+    this.requirePublicationApiBase()
+    return getNoteWithEngagement(this.endpoints, id)
   }
 
   getComment(id: number | string): Promise<unknown> {
@@ -198,10 +220,11 @@ export class SubstackClient {
   }
 
   /** Returns the reply branches for a Note from Substack's global reader endpoint. */
-  getNoteReplies<TBranch = unknown, TRootComment = unknown>(
-    id: number | string
+  getNoteReplies<TBranch = NoteReplyBranch, TRootComment = NoteComment>(
+    id: number | string,
+    options: CursorOptions = {}
   ): Promise<NoteRepliesResponse<TBranch, TRootComment>> {
-    return getNoteReplies<TBranch, TRootComment>(this.endpoints, id)
+    return getNoteReplies<TBranch, TRootComment>(this.endpoints, id, options)
   }
 
   /**
@@ -252,16 +275,16 @@ export class SubstackClient {
    * Returns email delivery and engagement statistics for this publication's posts.
    * The response is available only to authenticated publication administrators.
    */
-  getEmailStats<T = unknown>(options: EmailStatsOptions = {}): Promise<EmailStatsPage<T>> {
+  getEmailStats<T = EmailStatsRow>(options: EmailStatsOptions = {}): Promise<EmailStatsPage<T>> {
     return getEmailStats(this.endpoints, options)
   }
 
   /**
    * Retrieves every available email-stat row, starting at `options.offset`.
    * It continues until Substack returns an empty page and returns a flat array
-   * of rows. Use `options.limit` to control the number requested per page.
+   * of rows. Substack requires every page request to use a limit of 20.
    */
-  getAllEmailStats<T = unknown>(options: EmailStatsOptions = {}): Promise<T[]> {
+  getAllEmailStats<T = EmailStatsRow>(options: EmailStatsOptions = {}): Promise<T[]> {
     return getAllEmailStats(this.endpoints, options)
   }
 

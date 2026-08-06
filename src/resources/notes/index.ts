@@ -6,10 +6,15 @@ import type {
   DraftNotesOptions,
   DraftNotesPage,
   NoteCommentOptions,
+  NoteComment,
+  NoteEngagement,
+  NoteFeedItem,
   NoteLikeOptions,
+  NoteReplyBranch,
   NoteRepliesResponse,
+  NoteResponse,
   NoteRestackOptions,
-  ProfileNoteItem,
+  NoteWithEngagement,
   ProfileNotesPage,
   PublishNoteRequest,
   ScheduleNoteRequest,
@@ -25,21 +30,6 @@ function cursorQuery(options?: CursorOptions): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function viewerHasLiked(item: Record<string, unknown>): boolean | null {
-  if (!isRecord(item.comment)) {
-    return null
-  }
-
-  const reaction = item.comment.reaction
-  if (reaction === '❤') {
-    return true
-  }
-  if (reaction === undefined || reaction === null || reaction === false) {
-    return false
-  }
-  return null
 }
 
 function noteBodyJson(body: string): Record<string, unknown> {
@@ -68,8 +58,8 @@ export function getDraftNotes<T = unknown>(
   return context.global(`/feed/drafts?limit=${limit}`)
 }
 
-export async function getProfileNotes<
-  T extends Record<string, unknown> = Record<string, unknown>
+export function getProfileNotes<
+  T extends Record<string, unknown> = NoteFeedItem
 >(
   context: EndpointContext,
   id: number | string,
@@ -80,24 +70,10 @@ export async function getProfileNotes<
   if (options.cursor) {
     query.set('cursor', options.cursor)
   }
-  const response = await context.publication<unknown>(
-    `/reader/feed/profile/${profileId}?${query.toString()}`
-  )
-
-  if (!isRecord(response) || !Array.isArray(response.items)) {
-    return response as ProfileNotesPage<T>
-  }
-
-  const items = response.items.map((item) =>
-    isRecord(item)
-      ? ({ ...item, viewerHasLiked: viewerHasLiked(item) } as ProfileNoteItem<T>)
-      : item
-  )
-
-  return { ...response, items } as ProfileNotesPage<T>
+  return context.publication(`/reader/feed/profile/${profileId}?${query.toString()}`)
 }
 
-export function getNote(context: EndpointContext, id: number | string): Promise<unknown> {
+export function getNote<T = NoteResponse>(context: EndpointContext, id: number | string): Promise<T> {
   return context.publication(`/reader/comment/${positiveInteger(id, 'Note ID')}`)
 }
 
@@ -105,12 +81,141 @@ export function getComment(context: EndpointContext, id: number | string): Promi
   return context.publication(`/reader/comment/${positiveInteger(id, 'Comment ID')}`)
 }
 
-export function getNoteReplies<TBranch = unknown, TRootComment = unknown>(
+export function getNoteReplies<TBranch = NoteReplyBranch, TRootComment = NoteComment>(
   context: EndpointContext,
-  id: number | string
+  id: number | string,
+  options: CursorOptions = {}
 ): Promise<NoteRepliesResponse<TBranch, TRootComment>> {
   const noteId = positiveInteger(id, 'Note ID')
-  return context.global(`/reader/comment/${noteId}/replies?comment_id=${noteId}`)
+  const query = new URLSearchParams({ comment_id: String(noteId) })
+  if (options.cursor) {
+    query.set('cursor', options.cursor)
+  }
+  return context.global(`/reader/comment/${noteId}/replies?${query.toString()}`)
+}
+
+function nonNegativeNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
+}
+
+function viewerHasLiked(comment: NoteComment): boolean | undefined {
+  if (typeof comment.viewer_has_liked === 'boolean') {
+    return comment.viewer_has_liked
+  }
+  if (comment.reaction === '❤') {
+    return true
+  }
+  if (comment.reaction === undefined || comment.reaction === null || comment.reaction === false) {
+    return false
+  }
+  return undefined
+}
+
+function viewerHasRestacked(comment: NoteComment): boolean | undefined {
+  return typeof comment.viewer_has_restacked === 'boolean'
+    ? comment.viewer_has_restacked
+    : typeof comment.restacked === 'boolean'
+      ? comment.restacked
+      : undefined
+}
+
+function noteEngagement(
+  note: NoteResponse,
+  pages: NoteRepliesResponse[]
+): { replies: NoteReplyBranch[]; engagement: NoteEngagement } {
+  const item = isRecord(note.item) ? note.item : undefined
+  const comment = isRecord(item?.comment) ? (item.comment as NoteComment) : undefined
+  const replies: NoteReplyBranch[] = []
+  let nestedReplyCount = 0
+  let replyCountsComplete = true
+
+  for (const page of pages) {
+    const moreBranches = nonNegativeNumber(page.moreBranches)
+    if (moreBranches !== undefined && moreBranches > 0 && !page.nextCursor) {
+      replyCountsComplete = false
+    }
+    if (!Array.isArray(page.commentBranches)) {
+      replyCountsComplete = false
+      continue
+    }
+
+    for (const branchValue of page.commentBranches) {
+      if (!isRecord(branchValue)) {
+        replyCountsComplete = false
+        continue
+      }
+
+      const branch = branchValue as NoteReplyBranch
+      replies.push(branch)
+      if (!Array.isArray(branch.descendantComments)) {
+        replyCountsComplete = false
+        continue
+      }
+      nestedReplyCount += branch.descendantComments.length
+    }
+  }
+
+  const engagement: NoteEngagement = { replyCountsComplete }
+  const reactionCount = nonNegativeNumber(comment?.reaction_count)
+  const reportedDirectReplyCount = nonNegativeNumber(comment?.children_count)
+  const restackCount = nonNegativeNumber(comment?.restacks)
+  const viewCount = nonNegativeNumber(comment?.views) ?? nonNegativeNumber(comment?.view_count)
+  const liked = comment ? viewerHasLiked(comment) : undefined
+  const restacked = comment ? viewerHasRestacked(comment) : undefined
+
+  if (reactionCount !== undefined) engagement.reactionCount = reactionCount
+  if (reportedDirectReplyCount !== undefined) {
+    engagement.reportedDirectReplyCount = reportedDirectReplyCount
+  }
+  if (restackCount !== undefined) engagement.restackCount = restackCount
+  if (viewCount !== undefined) engagement.viewCount = viewCount
+  if (liked !== undefined) engagement.viewerHasLiked = liked
+  if (restacked !== undefined) engagement.viewerHasRestacked = restacked
+  if (replyCountsComplete) {
+    engagement.directReplyCount = replies.length
+    engagement.nestedReplyCount = nestedReplyCount
+    engagement.totalReplyCount = replies.length + nestedReplyCount
+  }
+
+  return { replies, engagement }
+}
+
+/**
+ * Fetches a Note plus every cursor-paginated reply branch and returns only
+ * reliably derived visible reply totals in the normalized engagement object.
+ */
+export async function getNoteWithEngagement(
+  context: EndpointContext,
+  id: number | string
+): Promise<NoteWithEngagement> {
+  const noteId = positiveInteger(id, 'Note ID')
+  const [note, firstReplyPage] = await Promise.all([
+    getNote<NoteResponse>(context, noteId),
+    getNoteReplies<NoteReplyBranch, NoteComment>(context, noteId)
+  ])
+  const replyPages: NoteRepliesResponse[] = [firstReplyPage]
+  const seenCursors = new Set<string>()
+  let cursor = firstReplyPage.nextCursor
+
+  while (typeof cursor === 'string' && cursor) {
+    if (seenCursors.has(cursor)) {
+      break
+    }
+    seenCursors.add(cursor)
+    const page = await getNoteReplies<NoteReplyBranch, NoteComment>(context, noteId, { cursor })
+    replyPages.push(page)
+    cursor = page.nextCursor
+  }
+
+  const normalized = noteEngagement(note, replyPages)
+  if (typeof cursor !== 'undefined' && cursor !== null && cursor !== '') {
+    normalized.engagement.replyCountsComplete = false
+    delete normalized.engagement.directReplyCount
+    delete normalized.engagement.nestedReplyCount
+    delete normalized.engagement.totalReplyCount
+  }
+
+  return { note, replyPages, ...normalized }
 }
 
 /** Permanently deletes a Note or Note draft owned by the authenticated account. */
