@@ -2,6 +2,8 @@ import { SubstackApiError } from '../../core/errors.js'
 import type { EndpointContext } from '../../core/transport.js'
 import { positiveInteger } from '../../core/validation.js'
 import type {
+  PostManagementDetail,
+  PostManagementPost,
   PostWithEngagement,
   PostWithEngagementOptions,
   SubstackPostComment
@@ -76,6 +78,14 @@ function sumCommentMetric(comments: SubstackPostComment[], field: 'reaction_coun
 
 export function getPost<T = unknown>(context: EndpointContext, id: string | number): Promise<T> {
   return context.global(`/posts/by-id/${encodeURIComponent(String(positiveInteger(id, 'Post ID')))}`)
+}
+
+/** Returns Substack's raw author-facing analytics detail for one publication post. */
+export function getPostManagementDetail<TPost = PostManagementPost>(
+  context: EndpointContext,
+  id: string | number
+): Promise<PostManagementDetail<TPost>> {
+  return context.publication(`/post_management/detail/${positiveInteger(id, 'Post ID')}`)
 }
 
 /**

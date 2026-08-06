@@ -56,23 +56,117 @@ export interface NoteRestackOptions extends NoteActionOptions {
   surface?: string
 }
 
-export type ProfileNoteItem<T extends Record<string, unknown> = Record<string, unknown>> = T & {
-  viewerHasLiked: boolean | null
-}
-
-export type ProfileNotesPage<T extends Record<string, unknown> = Record<string, unknown>> = {
-  items?: ProfileNoteItem<T>[]
+/** Current engagement counters copied into Note feed tracking metadata. */
+export interface NoteTrackingParameters {
+  item_current_reaction_count?: number
+  item_current_reply_count?: number
+  item_current_restack_count?: number
   [key: string]: unknown
 }
 
-/** An unmodified response from Substack's Note replies endpoint. */
-export type NoteRepliesResponse<TBranch = unknown, TRootComment = unknown> = {
+/** An unmodified Note/comment object returned by Substack's reader endpoints. */
+export interface NoteComment {
+  id?: number
+  post_id?: number | null
+  publication_id?: number | null
+  type?: string
+  reaction?: string | boolean | null
+  reaction_count?: number
+  reactions?: Record<string, number>
+  restacked?: boolean
+  restacks?: number
+  /** Direct child replies to this comment. */
+  children_count?: number
+  /** Unconfirmed candidates retained for forward-compatible raw response typing. */
+  comment_count?: number
+  reply_count?: number
+  child_comment_count?: number
+  descendant_comment_count?: number
+  viewer_has_liked?: boolean
+  viewer_has_restacked?: boolean
+  views?: number
+  view_count?: number
+  tracking_parameters?: NoteTrackingParameters
+  [key: string]: unknown
+}
+
+/** An unmodified reader-feed item whose `comment` is a Note. */
+export interface NoteFeedItem<TComment extends NoteComment = NoteComment> {
+  comment?: TComment
+  trackingParameters?: NoteTrackingParameters
+  [key: string]: unknown
+}
+
+/** The raw item returned by getProfileNotes(). */
+export type ProfileNoteItem<T extends Record<string, unknown> = NoteFeedItem> = T
+
+/** An unmodified page from Substack's profile Notes feed. */
+export type ProfileNotesPage<T extends Record<string, unknown> = NoteFeedItem> = {
+  items?: T[]
+  nextCursor?: string | null
+  originalCursorTimestamp?: string
+  [key: string]: unknown
+}
+
+/** An unmodified response from Substack's single-Note reader endpoint. */
+export type NoteResponse<TItem extends NoteFeedItem = NoteFeedItem> = {
+  item?: TItem
+  [key: string]: unknown
+}
+
+/** One reply item nested within a Note reply branch. */
+export interface NoteReplyItem<TComment extends NoteComment = NoteComment> {
+  comment?: TComment
+  type?: string
+  [key: string]: unknown
+}
+
+/** One direct Note reply and every nested reply returned in its branch. */
+export interface NoteReplyBranch<TComment extends NoteComment = NoteComment>
+  extends NoteReplyItem<TComment> {
+  descendantComments?: NoteReplyItem<TComment>[]
+}
+
+/** An unmodified response page from Substack's Note replies endpoint. */
+export type NoteRepliesResponse<
+  TBranch = NoteReplyBranch,
+  TRootComment = NoteComment
+> = {
   commentBranches?: TBranch[]
   moreBranches?: number
   nextCursor?: string | null
   rootComment?: TRootComment
   automodHiddenBranches?: TBranch[]
   [key: string]: unknown
+}
+
+/** Normalized, reliably observed Note engagement fields. */
+export interface NoteEngagement {
+  reactionCount?: number
+  /** Direct replies reported by the Note's `children_count` field. */
+  reportedDirectReplyCount?: number
+  /** Visible direct reply branches loaded across every reply page. */
+  directReplyCount?: number
+  /** Visible entries in every reply branch's `descendantComments` array. */
+  nestedReplyCount?: number
+  /** `directReplyCount + nestedReplyCount` when all reply pages are complete. */
+  totalReplyCount?: number
+  restackCount?: number
+  /** Reserved for a future observed `views` or `view_count` field. */
+  viewCount?: number
+  viewerHasLiked?: boolean
+  viewerHasRestacked?: boolean
+  /** False when an upstream reply page cannot be safely aggregated. */
+  replyCountsComplete: boolean
+}
+
+/** Raw Note data, raw reply pages, and explicitly normalized engagement totals. */
+export interface NoteWithEngagement {
+  note: NoteResponse
+  replyPages: NoteRepliesResponse[]
+  /** Visible direct reply branches flattened across every page. */
+  replies: NoteReplyBranch[]
+  engagement: NoteEngagement
 }
 
 /** Options for the authenticated account's scheduled Note drafts. */
@@ -113,6 +207,14 @@ export interface PostEngagement {
   reactions?: unknown
   reactionCount?: number
   restackCount?: number
+  /** Publication analytics use these normalized names when present. */
+  deliveryCount?: number
+  openCount?: number
+  clickCount?: number
+  likeCount?: number
+  commentCount?: number
+  shareCount?: number
+  viewCount?: number
   /** The count reported by the post endpoint, which can include hidden or moderated comments. */
   reportedCommentCount?: number
   /** The reply count reported by the post endpoint. */
@@ -142,7 +244,7 @@ export interface PostWithEngagement {
 export interface EmailStatsOptions {
   /** Zero-based row offset. Defaults to 0. */
   offset?: number
-  /** Number of rows to return. Defaults to 20. */
+  /** @deprecated Ignored. Substack's email-stats endpoint requires a fixed limit of 20. */
   limit?: number
   /** Upstream email-stat field to sort by. Defaults to `post_date`. */
   orderBy?: string
@@ -150,9 +252,97 @@ export interface EmailStatsOptions {
   orderDirection?: 'asc' | 'desc'
 }
 
+/** One raw row from the publication email statistics endpoint. */
+export interface EmailStatsRow {
+  post_id?: number
+  title?: string
+  post_date?: string
+  audience?: string | number
+  bylines?: string
+  section_id?: number | null
+  section_name?: string | null
+  tags?: string
+  type?: string
+  sent?: number
+  queued?: number
+  delivered?: number
+  dropped?: number
+  opened?: number
+  opens?: number
+  open_rate?: number
+  unique_opens_day7?: number
+  unique_opens_day28?: number
+  clicked?: number
+  clicks?: number
+  click_through_rate?: number
+  likes?: number
+  comments?: number
+  shares?: number
+  restacks?: number
+  views?: number
+  engagement_rate?: number
+  unique_engagements?: number
+  complaints?: number
+  signups?: number
+  signups_within_1_day?: number
+  subscribes?: number
+  subscriptions_within_1_day?: number
+  annual_subscribes?: number
+  monthly_subscribes?: number
+  founding_subscribes?: number
+  free_trials?: number
+  free_to_paid_upgrades?: number
+  unsubscribes?: number
+  unsubscribes_within_1_day?: number
+  disables_within_1_day?: number
+  estimated_value?: number
+  subscribers_finished_post?: number
+  downloads?: number
+  downloads_day7?: number
+  downloads_day30?: number
+  downloads_day90?: number
+  podcast_preview_downloads?: number | string
+  podcast_preview_downloads_day30?: number | string
+  video_views?: number
+  video_minutes_watched?: number
+  [key: string]: unknown
+}
+
 /** An unmodified page from Substack's publication email statistics endpoint. */
-export type EmailStatsPage<T = unknown> = {
+export type EmailStatsPage<T = EmailStatsRow> = {
   rows?: T[]
+  total?: number
+  [key: string]: unknown
+}
+
+/** Per-post analytics nested under `posts[].stats` by post-management detail. */
+export interface PostManagementStats extends EmailStatsRow {
+  links?: Array<[string, number, ...unknown[]]>
+  has_more_links?: boolean
+  firstWeekDailyStats?: Array<Record<string, unknown>>
+  referrers?: Record<string, unknown>
+  comps?: Record<string, unknown>
+  data_updated_at?: number | string
+  [key: string]: unknown
+}
+
+/** One raw post object from the post-management detail endpoint. */
+export interface PostManagementPost {
+  id?: number
+  publication_id?: number
+  reaction?: string | boolean | null
+  reaction_count?: number
+  reactions?: Record<string, number>
+  comment_count?: number
+  child_comment_count?: number
+  stats?: PostManagementStats
+  [key: string]: unknown
+}
+
+/** Unmodified response from `/post_management/detail/{post_id}`. */
+export type PostManagementDetail<TPost = PostManagementPost> = {
+  posts?: TPost[]
+  total?: number
   [key: string]: unknown
 }
 

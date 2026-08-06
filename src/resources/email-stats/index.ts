@@ -1,19 +1,21 @@
 import { SubstackApiError } from '../../core/errors.js'
 import type { EndpointContext } from '../../core/transport.js'
-import { nonNegativeInteger, positiveInteger } from '../../core/validation.js'
-import type { EmailStatsOptions, EmailStatsPage } from '../../core/types.js'
+import { nonNegativeInteger } from '../../core/validation.js'
+import type { EmailStatsOptions, EmailStatsPage, EmailStatsRow } from '../../core/types.js'
+
+const EMAIL_STATS_LIMIT = 20
 
 function emailStatsQuery(options: EmailStatsOptions): URLSearchParams {
   return new URLSearchParams({
     offset: String(nonNegativeInteger(options.offset ?? 0, 'Email stats offset')),
-    limit: String(positiveInteger(options.limit ?? 20, 'Email stats limit')),
+    limit: String(EMAIL_STATS_LIMIT),
     order_by: options.orderBy ?? 'post_date',
     order_direction: options.orderDirection ?? 'desc'
   })
 }
 
 /** Returns email delivery and engagement statistics for a publication's posts. */
-export function getEmailStats<T = unknown>(
+export function getEmailStats<T = EmailStatsRow>(
   context: EndpointContext,
   options: EmailStatsOptions = {}
 ): Promise<EmailStatsPage<T>> {
@@ -21,16 +23,15 @@ export function getEmailStats<T = unknown>(
 }
 
 /** Retrieves every available email-stat row, starting at `options.offset`. */
-export async function getAllEmailStats<T = unknown>(
+export async function getAllEmailStats<T = EmailStatsRow>(
   context: EndpointContext,
   options: EmailStatsOptions = {}
 ): Promise<T[]> {
   const rows: T[] = []
   let offset = nonNegativeInteger(options.offset ?? 0, 'Email stats offset')
-  const limit = positiveInteger(options.limit ?? 20, 'Email stats limit')
 
   while (true) {
-    const page = await getEmailStats<T>(context, { ...options, offset, limit })
+    const page = await getEmailStats<T>(context, { ...options, offset })
     if (!Array.isArray(page.rows)) {
       throw new SubstackApiError(
         'Substack returned an email stats response without a rows array.',
