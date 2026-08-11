@@ -45,7 +45,7 @@ Copy [`.dev.vars.example`](.dev.vars.example) to `.dev.vars` and replace the pla
 
 ## MCP server
 
-The package includes a read-only STDIO MCP server with tools for recent posts, email stats, post engagement, Notes, and compact content analysis. Set `SUBSTACK_SESSION_TOKEN` and `SUBSTACK_PUBLICATION_URL`, then configure Codex:
+The package includes a read-only STDIO MCP server for publication, post, Note, subscriber, and activity analytics. It exposes both bounded raw endpoint data and compact full-history summaries. Set `SUBSTACK_SESSION_TOKEN` and `SUBSTACK_PUBLICATION_URL`, then configure Codex:
 
 ```toml
 [mcp_servers.substack]
@@ -57,7 +57,25 @@ SUBSTACK_SESSION_TOKEN = "your-substack.sid-value"
 SUBSTACK_PUBLICATION_URL = "https://your-publication.substack.com"
 ```
 
-Keep the session token local and out of source control. All MCP tools are read-only.
+Keep the session token local and out of source control. All MCP tools are read-only and declare MCP read-only annotations.
+
+| MCP tool | Description |
+| --- | --- |
+| `get_authenticated_profile` | Authenticated profile and the profile ID used by profile tools. |
+| `get_recent_posts` | Bounded recent posts for a profile. |
+| `get_email_stats` | One Substack email-stat page. Substack always fetches 20 rows; `limit` caps returned rows. |
+| `get_publication_analytics` | Full-history totals, average upstream rates, audience/section/type breakdowns, top posts, and optional raw rows. |
+| `get_post_engagement` | Post content engagement and a bounded visible-comment sample. |
+| `get_post_analytics` | Combined author analytics, delivery, conversion, media, links, referrers, comparison data, and visible engagement. |
+| `get_notes` | Bounded authenticated-publication Notes page. |
+| `get_profile_notes` | Bounded profile Notes page with raw per-Note metrics. |
+| `get_note_engagement` | Reactions, restacks, viewer state, and fully paginated direct/nested reply totals. |
+| `get_subscriber_summary` | Privacy-safe subscriber totals. Raw records require explicit `include_records: true`. |
+| `get_activity` | Bounded activity filtered by all events, replies and mentions, or restacks. |
+| `get_unread_activity` | Bounded unread activity plus unread metadata. |
+| `analyze_content` | Compact complete analytics for one post without comment or raw-response payloads. |
+
+`get_publication_analytics` follows every email-stat page before calculating its summary, so it can make several authenticated requests for a large archive. Raw rows are excluded by default and capped when requested. `get_subscriber_summary` excludes subscriber records by default because they can contain email addresses and other personal data. See [MCP analytics](docs/mcp-analytics.md) for output semantics and usage examples.
 
 ## API
 
