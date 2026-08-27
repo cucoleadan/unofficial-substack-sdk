@@ -119,7 +119,216 @@ const readOnlyAnnotations = {
   openWorldHint: true
 } as const
 
-const outputSchema = { data: z.unknown() }
+const authenticatedProfileOutputSchema = {
+  data: z
+    .object({
+      id: z.number().describe('Numeric author / user profile ID'),
+      handle: z.string().optional().describe('Substack username handle'),
+      name: z.string().optional().describe('Display name'),
+      photo_url: z.string().optional(),
+      bio: z.string().optional()
+    })
+    .passthrough()
+}
+
+const recentPostsOutputSchema = {
+  data: z
+    .object({
+      posts: z.array(z.record(z.string(), z.unknown())).describe('Recent published posts')
+    })
+    .passthrough()
+}
+
+const emailStatsOutputSchema = {
+  data: z
+    .object({
+      rows: z.array(z.record(z.string(), z.unknown())).describe('Email stats rows for sent posts'),
+      offset: z.number().optional().describe('Pagination offset'),
+      limit: z.number().optional().describe('Row limit')
+    })
+    .passthrough()
+}
+
+const publicationAnalyticsOutputSchema = {
+  data: z
+    .object({
+      totals: z.record(z.string(), z.unknown()).describe('Aggregate metric totals across email history'),
+      summary: z.record(z.string(), z.unknown()).optional().describe('Average open, click, and engagement rates'),
+      breakdowns: z.record(z.string(), z.unknown()).optional().describe('Aggregates broken down by audience and post type'),
+      top_posts: z.array(z.record(z.string(), z.unknown())).optional().describe('Top performing posts ranked by requested metric'),
+      rows: z.array(z.record(z.string(), z.unknown())).optional().describe('Bounded raw email rows if include_rows was requested')
+    })
+    .passthrough()
+}
+
+const postEngagementOutputSchema = {
+  data: z
+    .object({
+      post: z.record(z.string(), z.unknown()).optional().describe('Post content and metadata'),
+      comments: z.array(z.record(z.string(), z.unknown())).optional().describe('Visible reader comments'),
+      engagement: z.record(z.string(), z.unknown()).optional().describe('Calculated reaction, comment, and engagement totals')
+    })
+    .passthrough()
+}
+
+const postAnalyticsOutputSchema = {
+  data: z
+    .object({
+      post: z.record(z.string(), z.unknown()).optional().describe('Post details'),
+      engagement: z.record(z.string(), z.unknown()).optional().describe('Calculated engagement summary'),
+      stats: z.record(z.string(), z.unknown()).optional().describe('Author analytics including traffic, conversions, and delivery')
+    })
+    .passthrough()
+}
+
+const notesOutputSchema = {
+  data: z
+    .object({
+      items: z.array(z.record(z.string(), z.unknown())).describe('Notes items'),
+      cursor: z.string().optional().describe('Pagination cursor for next page')
+    })
+    .passthrough()
+}
+
+const profileNotesOutputSchema = {
+  data: z
+    .object({
+      items: z.array(z.record(z.string(), z.unknown())).describe('Notes published by profile'),
+      cursor: z.string().optional().describe('Pagination cursor for next page')
+    })
+    .passthrough()
+}
+
+const noteEngagementOutputSchema = {
+  data: z
+    .object({
+      item: z.record(z.string(), z.unknown()).optional().describe('Note item details'),
+      replies: z.array(z.record(z.string(), z.unknown())).optional().describe('Visible Note replies'),
+      engagement: z.record(z.string(), z.unknown()).optional().describe('Calculated reaction and restack totals')
+    })
+    .passthrough()
+}
+
+const subscriberSummaryOutputSchema = {
+  data: z
+    .object({
+      count: z.number().optional().describe('Total active subscriber count'),
+      aggregates: z.record(z.string(), z.unknown()).optional().describe('Aggregated subscriber stats'),
+      subscribers: z.array(z.record(z.string(), z.unknown())).optional().describe('Raw subscriber records (only when requested)')
+    })
+    .passthrough()
+}
+
+const subscriberStatsOutputSchema = {
+  data: z
+    .object({
+      total_subscribers: z.number().optional().describe('Total subscriber count'),
+      active_subscribers_delivered: z.number().optional().describe('Subscribers delivered on latest email'),
+      recent_signups: z.number().optional().describe('Recent email signups count'),
+      open_rate: z.number().optional().describe('Open rate percentage'),
+      latest_post_title: z.string().optional().describe('Title of latest delivered post'),
+      derived_from_delivery: z.boolean().optional().describe('Whether stats were derived from email delivery')
+    })
+    .passthrough()
+}
+
+const activityOutputSchema = {
+  data: z
+    .object({
+      activityItems: z.array(z.record(z.string(), z.unknown())).describe('Activity notification items')
+    })
+    .passthrough()
+}
+
+const unreadActivityOutputSchema = {
+  data: z
+    .object({
+      activityItems: z.array(z.record(z.string(), z.unknown())).describe('Unread activity notification items'),
+      unread: z.record(z.string(), z.unknown()).optional().describe('Unread count and metadata')
+    })
+    .passthrough()
+}
+
+const analyzeContentOutputSchema = {
+  data: z
+    .object({
+      post_id: z.union([z.number(), z.string()]).optional().describe('Post ID'),
+      title: z.string().optional().describe('Post title'),
+      performance: z.record(z.string(), z.unknown()).optional().describe('Performance and conversion summary'),
+      engagement: z.record(z.string(), z.unknown()).optional().describe('Engagement summary')
+    })
+    .passthrough()
+}
+
+const growthMetricPointSchema = z.object({
+  date: z.string().describe('Snapshot or entry date'),
+  value: z.number().describe('Metric value')
+})
+
+const growthMetricSchema = z.object({
+  name: z.string().describe('Metric name (Traffic, Subscribers, Revenue)'),
+  total: z.number().nullable().optional().describe('Total aggregate for the period'),
+  timeseries: z.array(growthMetricPointSchema).optional()
+})
+
+const growthSourceItemSchema: z.ZodType<any> = z.lazy(() =>
+  z.object({
+    source: z.string().optional().describe('Source identifier slug'),
+    sourceName: z.string().optional().describe('Display source name'),
+    category: z.string().optional().describe('Source category'),
+    logoUrl: z.string().optional(),
+    metrics: z.array(growthMetricSchema).optional(),
+    children: z.array(growthSourceItemSchema).optional()
+  })
+)
+
+const growthIntervalSchema = z.object({
+  startDate: z.string().describe('Interval start date (YYYY-MM-DD)'),
+  endDate: z.string().describe('Interval end date (YYYY-MM-DD)'),
+  totals: z
+    .array(
+      z.object({
+        name: z.string().optional(),
+        total: z.number().nullable().optional()
+      })
+    )
+    .optional(),
+  sourceMetrics: z.array(growthSourceItemSchema).optional()
+})
+
+const growthSourcesOutputSchema = {
+  data: z
+    .object({
+      granularity: z
+        .enum(['total', 'day', 'week', 'month'])
+        .optional()
+        .describe('Aggregation granularity'),
+      totals: z
+        .array(
+          z.object({
+            name: z.string().optional().describe('Metric name (traffic, subscribers, revenue)'),
+            total: z.number().nullable().optional().describe('Total value across period')
+          })
+        )
+        .optional(),
+      intervals: z
+        .array(growthIntervalSchema)
+        .optional()
+        .describe('Interval slices when granularity is day, week, or month'),
+      sourceMetrics: z
+        .array(growthSourceItemSchema)
+        .optional()
+        .describe('Acquisition sources when granularity is total')
+    })
+    .passthrough()
+}
+
+const growthSourcesGranularity = z
+  .enum(['total', 'day', 'week', 'month'])
+  .default('total')
+  .describe(
+    'Aggregation interval: "total" for full period aggregate (1 fast call), "week" for weekly trend intervals (max 26 weeks), "day" for daily trend intervals (max 31 days), or "month" for monthly trend intervals (max 24 months). Requests are rate-limited to max 2 req/sec.'
+  )
 
 function result(data: unknown): ToolResult {
   const output = { data }
@@ -406,7 +615,7 @@ export function createToolHandlers(client: ReadOnlyClient) {
 }
 
 export function createMcpServer(client: ReadOnlyClient): McpServer {
-  const server = new McpServer({ name: 'substack-mcp', version: '0.3.7' })
+  const server = new McpServer({ name: 'substack-mcp', version: '0.3.8' })
   const tools = createToolHandlers(client)
 
   server.registerTool(
@@ -414,7 +623,7 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
     {
       title: 'Get authenticated Substack profile',
       description: 'Get the authenticated profile, including the profile ID needed by profile tools.',
-      outputSchema,
+      outputSchema: authenticatedProfileOutputSchema,
       annotations: readOnlyAnnotations
     },
     () => tools.getAuthenticatedProfile()
@@ -425,7 +634,7 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
       title: 'Get recent posts',
       description: 'Get recent posts for a Substack profile.',
       inputSchema: { profile_id: id, limit },
-      outputSchema,
+      outputSchema: recentPostsOutputSchema,
       annotations: readOnlyAnnotations
     },
     ({ profile_id, limit }) => tools.getRecentPosts(profile_id, limit)
@@ -442,7 +651,7 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
         order_by: z.string().min(1).default('post_date'),
         order_direction: orderDirection
       },
-      outputSchema,
+      outputSchema: emailStatsOutputSchema,
       annotations: readOnlyAnnotations
     },
     ({ offset, limit, order_by, order_direction }) =>
@@ -465,7 +674,7 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
         include_rows: z.boolean().default(false),
         row_limit: rawRowLimit
       },
-      outputSchema,
+      outputSchema: publicationAnalyticsOutputSchema,
       annotations: readOnlyAnnotations
     },
     ({
@@ -497,7 +706,7 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
       title: 'Get post engagement',
       description: 'Get a post, its visible comments, and content engagement totals.',
       inputSchema: { post_id: id, comment_limit: limit },
-      outputSchema,
+      outputSchema: postEngagementOutputSchema,
       annotations: readOnlyAnnotations
     },
     ({ post_id, comment_limit }) => tools.getPostEngagement(post_id, comment_limit)
@@ -513,7 +722,7 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
         comment_limit: limit,
         include_raw: z.boolean().default(false)
       },
-      outputSchema,
+      outputSchema: postAnalyticsOutputSchema,
       annotations: readOnlyAnnotations
     },
     ({ post_id, comment_limit, include_raw }) =>
@@ -525,7 +734,7 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
       title: 'Get publication Notes',
       description: 'Get a bounded page of authenticated publication Notes.',
       inputSchema: { cursor: z.string().optional(), limit },
-      outputSchema,
+      outputSchema: notesOutputSchema,
       annotations: readOnlyAnnotations
     },
     ({ cursor, limit }) => tools.getNotes(cursor, limit)
@@ -536,7 +745,7 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
       title: 'Get profile Notes',
       description: 'Get a bounded profile Notes page with raw per-Note engagement fields.',
       inputSchema: { profile_id: id, cursor: z.string().optional(), limit },
-      outputSchema,
+      outputSchema: profileNotesOutputSchema,
       annotations: readOnlyAnnotations
     },
     ({ profile_id, cursor, limit }) => tools.getProfileNotes(profile_id, cursor, limit)
@@ -552,7 +761,7 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
         reply_limit: limit,
         include_raw_pages: z.boolean().default(false)
       },
-      outputSchema,
+      outputSchema: noteEngagementOutputSchema,
       annotations: readOnlyAnnotations
     },
     ({ note_id, reply_limit, include_raw_pages }) =>
@@ -568,7 +777,7 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
         include_records: z.boolean().default(false),
         record_limit: rawRowLimit
       },
-      outputSchema,
+      outputSchema: subscriberSummaryOutputSchema,
       annotations: readOnlyAnnotations
     },
     ({ include_records, record_limit }) => tools.getSubscriberSummary(include_records, record_limit)
@@ -579,7 +788,7 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
       title: 'Get subscriber stats',
       description:
         'Get publication subscriber statistics or delivery-derived stats if subscriber-stats is unavailable.',
-      outputSchema,
+      outputSchema: subscriberStatsOutputSchema,
       annotations: readOnlyAnnotations
     },
     () => tools.getSubscriberStats()
@@ -590,7 +799,7 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
       title: 'Get Substack activity',
       description: 'Get bounded authenticated activity for all events, replies and mentions, or restacks.',
       inputSchema: { filter: activityFilter, limit },
-      outputSchema,
+      outputSchema: activityOutputSchema,
       annotations: readOnlyAnnotations
     },
     ({ filter, limit }) => tools.getActivity(filter, limit)
@@ -601,7 +810,7 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
       title: 'Get unread Substack activity',
       description: 'Get bounded unread authenticated activity plus unread-count metadata.',
       inputSchema: { limit },
-      outputSchema,
+      outputSchema: unreadActivityOutputSchema,
       annotations: readOnlyAnnotations
     },
     ({ limit }) => tools.getUnreadActivity(limit)
@@ -613,7 +822,7 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
       description:
         'Return complete author and content engagement analytics for one post without comment or raw-response payloads.',
       inputSchema: { post_id: id },
-      outputSchema,
+      outputSchema: analyzeContentOutputSchema,
       annotations: readOnlyAnnotations
     },
     ({ post_id }) => tools.analyzeContent(post_id)
@@ -623,7 +832,7 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
     {
       title: 'Get growth and traffic sources',
       description:
-        'Get historical breakdown of publication traffic, subscriber acquisition, and revenue by referrer / growth channel over a date range.',
+        'Get historical breakdown of publication traffic, subscriber acquisition, and revenue by referrer / growth channel over a date range. Supports granularity: "total" (default 1-shot aggregate), "week" (weekly trend lines), "day" (daily trend lines, max 31 days), or "month" (monthly trend lines).',
       inputSchema: {
         from_date: date.optional(),
         fromDate: date.optional(),
@@ -632,9 +841,10 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
         order_by: growthSourcesOrderBy.optional(),
         orderBy: growthSourcesOrderBy.optional(),
         order_direction: orderDirection.optional(),
-        orderDirection: orderDirection.optional()
+        orderDirection: orderDirection.optional(),
+        granularity: growthSourcesGranularity.optional()
       },
-      outputSchema,
+      outputSchema: growthSourcesOutputSchema,
       annotations: readOnlyAnnotations
     },
     (args: any) =>
@@ -642,7 +852,8 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
         fromDate: args.from_date ?? args.fromDate,
         toDate: args.to_date ?? args.toDate,
         orderBy: args.order_by ?? args.orderBy ?? 'users',
-        orderDirection: args.order_direction ?? args.orderDirection ?? 'desc'
+        orderDirection: args.order_direction ?? args.orderDirection ?? 'desc',
+        granularity: args.granularity ?? 'total'
       })
   )
 

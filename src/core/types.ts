@@ -473,6 +473,14 @@ export type UnreadActivityFeed = ActivityFeed & {
   unread: UnreadActivityMetadata
 }
 
+export interface GrowthInterval<TSource = GrowthSourceItem, TTotal = GrowthTotalItem> {
+  startDate: string
+  endDate: string
+  totals?: TTotal[]
+  sourceMetrics?: TSource[]
+  [key: string]: unknown
+}
+
 export interface GrowthSourcesOptions {
   /** Start date in YYYY-MM-DD format. */
   fromDate?: string
@@ -490,6 +498,8 @@ export interface GrowthSourcesOptions {
   orderDirection?: 'asc' | 'desc'
   /** Sort direction alias (snake_case). */
   order_direction?: 'asc' | 'desc'
+  /** Trend aggregation granularity: 'total' (default), 'day' (max 31 days), 'week', or 'month'. */
+  granularity?: 'total' | 'day' | 'week' | 'month'
 }
 
 export interface GrowthMetricTimeseriesPoint {
@@ -533,5 +543,7 @@ export type GrowthSourcesResponse<
 > = {
   sourceMetrics?: TSource[]
   totals?: TTotal[]
+  granularity?: 'total' | 'day' | 'week' | 'month'
+  intervals?: GrowthInterval<TSource, TTotal>[]
   [key: string]: unknown
 }
