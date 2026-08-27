@@ -284,7 +284,7 @@ describe('MCP tools', () => {
     expect(result.content[0].text).toBe('Failed to fetch subscriber stats: Network timeout')
   })
 
-  test('returns growth sources structured content from tool handler', async () => {
+  test('returns growth sources structured content from tool handler with snake_case and camelCase args', async () => {
     const tools = createToolHandlers(mockClient() as never)
     const result = await tools.getGrowthSources({
       fromDate: '2026-07-29',
@@ -294,6 +294,19 @@ describe('MCP tools', () => {
 
     expect(result.isError).toBeUndefined()
     expect(result.structuredContent).toEqual({
+      data: {
+        sourceMetrics: [{ source: 'substack', sourceName: 'Substack' }],
+        totals: [{ name: 'traffic', total: 149 }]
+      }
+    })
+
+    const snakeResult = await tools.getGrowthSources({
+      from_date: '2026-03-01',
+      to_date: '2026-03-31',
+      order_by: 'users'
+    })
+    expect(snakeResult.isError).toBeUndefined()
+    expect(snakeResult.structuredContent).toEqual({
       data: {
         sourceMetrics: [{ source: 'substack', sourceName: 'Substack' }],
         totals: [{ name: 'traffic', total: 149 }]
@@ -310,6 +323,13 @@ describe('MCP tools', () => {
 
     expect(result.isError).toBe(true)
     expect(result.content[0].text).toContain('fromDate cannot be after toDate')
+
+    const snakeInverted = await tools.getGrowthSources({
+      from_date: '2026-08-27',
+      to_date: '2026-07-29'
+    })
+    expect(snakeInverted.isError).toBe(true)
+    expect(snakeInverted.content[0].text).toContain('fromDate cannot be after toDate')
   })
 
   test('caps activity while retaining unread metadata', async () => {

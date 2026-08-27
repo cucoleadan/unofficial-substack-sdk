@@ -395,7 +395,9 @@ export function createToolHandlers(client: ReadOnlyClient) {
     },
     getGrowthSources: (options: GrowthSourcesOptions = {}) =>
       run(async () => {
-        if (options.fromDate && options.toDate && options.fromDate > options.toDate) {
+        const fromDate = options.fromDate ?? options.from_date
+        const toDate = options.toDate ?? options.to_date
+        if (fromDate && toDate && fromDate > toDate) {
           throw new SubstackConfigurationError('Growth sources fromDate cannot be after toDate.')
         }
         return client.getGrowthSources(options)
@@ -404,7 +406,7 @@ export function createToolHandlers(client: ReadOnlyClient) {
 }
 
 export function createMcpServer(client: ReadOnlyClient): McpServer {
-  const server = new McpServer({ name: 'substack-mcp', version: '0.3.5' })
+  const server = new McpServer({ name: 'substack-mcp', version: '0.3.6' })
   const tools = createToolHandlers(client)
 
   server.registerTool(
@@ -624,19 +626,23 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
         'Get historical breakdown of publication traffic, subscriber acquisition, and revenue by referrer / growth channel over a date range.',
       inputSchema: {
         from_date: date.optional(),
+        fromDate: date.optional(),
         to_date: date.optional(),
-        order_by: growthSourcesOrderBy,
-        order_direction: orderDirection
+        toDate: date.optional(),
+        order_by: growthSourcesOrderBy.optional(),
+        orderBy: growthSourcesOrderBy.optional(),
+        order_direction: orderDirection.optional(),
+        orderDirection: orderDirection.optional()
       },
       outputSchema,
       annotations: readOnlyAnnotations
     },
-    ({ from_date, to_date, order_by, order_direction }) =>
+    (args: any) =>
       tools.getGrowthSources({
-        fromDate: from_date,
-        toDate: to_date,
-        orderBy: order_by,
-        orderDirection: order_direction
+        fromDate: args.from_date ?? args.fromDate,
+        toDate: args.to_date ?? args.toDate,
+        orderBy: args.order_by ?? args.orderBy ?? 'users',
+        orderDirection: args.order_direction ?? args.orderDirection ?? 'desc'
       })
   )
 

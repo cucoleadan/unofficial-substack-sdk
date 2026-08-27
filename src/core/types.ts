@@ -476,12 +476,20 @@ export type UnreadActivityFeed = ActivityFeed & {
 export interface GrowthSourcesOptions {
   /** Start date in YYYY-MM-DD format. */
   fromDate?: string
+  /** Start date alias (snake_case). */
+  from_date?: string
   /** End date in YYYY-MM-DD format. */
   toDate?: string
+  /** End date alias (snake_case). */
+  to_date?: string
   /** Upstream metric to order by. Defaults to `users`. */
   orderBy?: 'users' | 'subscriptions' | 'annual_subscriptions' | 'revenue' | string
+  /** Upstream metric to order by alias (snake_case). */
+  order_by?: 'users' | 'subscriptions' | 'annual_subscriptions' | 'revenue' | string
   /** Sort direction. Defaults to `desc`. */
   orderDirection?: 'asc' | 'desc'
+  /** Sort direction alias (snake_case). */
+  order_direction?: 'asc' | 'desc'
 }
 
 export interface GrowthMetricTimeseriesPoint {
