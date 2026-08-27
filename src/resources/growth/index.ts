@@ -3,10 +3,15 @@ import type { GrowthSourcesOptions, GrowthSourcesResponse, GrowthSourceItem } fr
 
 function growthSourcesQuery(options: GrowthSourcesOptions): URLSearchParams {
   const params = new URLSearchParams()
-  params.set('order_by', options.orderBy ?? 'users')
-  params.set('order_direction', options.orderDirection ?? 'desc')
-  if (options.fromDate) params.set('from_date', options.fromDate)
-  if (options.toDate) params.set('to_date', options.toDate)
+  const orderBy = options.orderBy ?? options.order_by ?? 'users'
+  const orderDirection = options.orderDirection ?? options.order_direction ?? 'desc'
+  const fromDate = options.fromDate ?? options.from_date
+  const toDate = options.toDate ?? options.to_date
+
+  params.set('order_by', orderBy)
+  params.set('order_direction', orderDirection)
+  if (fromDate) params.set('from_date', fromDate)
+  if (toDate) params.set('to_date', toDate)
   return params
 }
 

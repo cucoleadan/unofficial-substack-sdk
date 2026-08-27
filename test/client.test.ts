@@ -686,6 +686,17 @@ describe('SubstackClient', () => {
     expect(requests[0].url).toBe(
       'https://allagentsconsidered.substack.com/api/v1/publication/stats/growth/sources?order_by=users&order_direction=desc&from_date=2026-07-29&to_date=2026-08-27'
     )
+
+    await client.getGrowthSources({
+      from_date: '2026-03-01',
+      to_date: '2026-03-31',
+      order_by: 'subscriptions',
+      order_direction: 'asc'
+    })
+
+    expect(requests[1].url).toBe(
+      'https://allagentsconsidered.substack.com/api/v1/publication/stats/growth/sources?order_by=subscriptions&order_direction=asc&from_date=2026-03-01&to_date=2026-03-31'
+    )
   })
 
   test('requires a publication URL for growth sources', () => {
