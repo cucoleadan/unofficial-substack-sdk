@@ -7,7 +7,7 @@ import {
   type EmailStatsOptions,
   type EmailStatsRow,
   type GrowthSourcesOptions
-} from './index.js'
+} from './core/index.js'
 
 type ReadOnlyClient = Pick<
   SubstackClient,
@@ -406,7 +406,7 @@ export function createToolHandlers(client: ReadOnlyClient) {
 }
 
 export function createMcpServer(client: ReadOnlyClient): McpServer {
-  const server = new McpServer({ name: 'substack-mcp', version: '0.3.6' })
+  const server = new McpServer({ name: 'substack-mcp', version: '0.3.7' })
   const tools = createToolHandlers(client)
 
   server.registerTool(
