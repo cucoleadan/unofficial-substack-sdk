@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'bun:test'
-import { SubstackApiError, SubstackConfigurationError } from '../src/index.js'
-import { clientFromEnvironment, createMcpServer, createToolHandlers } from '../src/mcp-server.js'
+import {
+  SubstackApiError,
+  SubstackConfigurationError,
+  clientFromEnvironment,
+  createMcpServer,
+  createToolHandlers
+} from '../src/index.js'
 
 const mockClient = (overrides: Record<string, unknown> = {}) => ({
   getAuthenticatedProfile: async () => ({ id: 7, handle: 'writer' }),
