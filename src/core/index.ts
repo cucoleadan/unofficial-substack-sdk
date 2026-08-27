@@ -16,6 +16,7 @@ export {
   type EmailStatsPage,
   type EmailStatsRow,
   type FetchLike,
+  type GrowthInterval,
   type GrowthMetric,
   type GrowthMetricTimeseriesPoint,
   type GrowthSourceItem,

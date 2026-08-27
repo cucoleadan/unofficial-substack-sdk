@@ -682,7 +682,7 @@ describe('SubstackClient', () => {
       orderDirection: 'desc'
     })
 
-    expect(result).toEqual(fakeResponse)
+    expect(result).toEqual({ ...fakeResponse, granularity: 'total' })
     expect(requests[0].url).toBe(
       'https://allagentsconsidered.substack.com/api/v1/publication/stats/growth/sources?order_by=users&order_direction=desc&from_date=2026-07-29&to_date=2026-08-27'
     )
@@ -697,6 +697,39 @@ describe('SubstackClient', () => {
     expect(requests[1].url).toBe(
       'https://allagentsconsidered.substack.com/api/v1/publication/stats/growth/sources?order_by=subscriptions&order_direction=asc&from_date=2026-03-01&to_date=2026-03-31'
     )
+
+    const weeklyResult = await client.getGrowthSources({
+      fromDate: '2026-08-01',
+      toDate: '2026-08-15',
+      granularity: 'week'
+    })
+
+    expect(weeklyResult.granularity).toBe('week')
+    expect(weeklyResult.intervals?.length).toBe(3)
+    expect(weeklyResult.intervals?.[0].startDate).toBe('2026-08-01')
+    expect(weeklyResult.intervals?.[0].endDate).toBe('2026-08-07')
+  })
+
+  test('enforces granularity limits and rejects inverted ranges', async () => {
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://allagentsconsidered.substack.com'
+    })
+
+    await expect(
+      client.getGrowthSources({
+        fromDate: '2026-01-01',
+        toDate: '2026-03-01',
+        granularity: 'day'
+      })
+    ).rejects.toThrow('Daily granularity is limited to a maximum range of 31 days')
+
+    await expect(
+      client.getGrowthSources({
+        fromDate: '2026-08-27',
+        toDate: '2026-08-01'
+      })
+    ).rejects.toThrow('Growth sources fromDate cannot be after toDate')
   })
 
   test('requires a publication URL for growth sources', () => {
