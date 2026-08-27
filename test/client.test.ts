@@ -604,6 +604,95 @@ describe('SubstackClient', () => {
     expect(request?.headers.get('cookie')).toBe('substack.sid=session-value')
   })
 
+  test('falls back to email-stats when subscriber-stats returns 404', async () => {
+    const requests: string[] = []
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://allagentsconsidered.substack.com',
+      fetch: async (input) => {
+        const url = new Request(input).url
+        requests.push(url)
+        if (url.includes('/subscriber-stats')) {
+          return new Response('Not Found', { status: 404 })
+        }
+        if (url.includes('/email-stats')) {
+          return Response.json([
+            {
+              delivered: 1500,
+              signups: 12,
+              title: 'Latest Post Title',
+              open_rate: 0.452
+            }
+          ])
+        }
+        return new Response('Not Found', { status: 404 })
+      }
+    })
+
+    const result = await client.getSubscriberStats()
+    expect(result).toEqual({
+      derived_from_delivery: true,
+      active_subscribers_delivered: 1500,
+      recent_signups: 12,
+      latest_post_title: 'Latest Post Title',
+      open_rate: '45.2%'
+    })
+    expect(requests).toEqual([
+      'https://allagentsconsidered.substack.com/api/v1/subscriber-stats',
+      'https://allagentsconsidered.substack.com/api/v1/email-stats'
+    ])
+  })
+
+  test('re-throws non-404 errors when getting subscriber stats', async () => {
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://allagentsconsidered.substack.com',
+      fetch: async () => new Response('Internal Server Error', { status: 500 })
+    })
+
+    await expect(client.getSubscriberStats()).rejects.toThrow(SubstackApiError)
+  })
+
+  test('gets publication growth sources with query options', async () => {
+    const requests: Request[] = []
+    const fakeResponse = {
+      sourceMetrics: [
+        {
+          source: 'substack',
+          sourceName: 'Substack',
+          metrics: [{ name: 'Traffic', total: 149 }]
+        }
+      ],
+      totals: [{ name: 'traffic', total: 149 }]
+    }
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://allagentsconsidered.substack.com',
+      fetch: async (input, init) => {
+        const request = new Request(input, init)
+        requests.push(request)
+        return Response.json(fakeResponse)
+      }
+    })
+
+    const result = await client.getGrowthSources({
+      fromDate: '2026-07-29',
+      toDate: '2026-08-27',
+      orderBy: 'users',
+      orderDirection: 'desc'
+    })
+
+    expect(result).toEqual(fakeResponse)
+    expect(requests[0].url).toBe(
+      'https://allagentsconsidered.substack.com/api/v1/publication/stats/growth/sources?order_by=users&order_direction=desc&from_date=2026-07-29&to_date=2026-08-27'
+    )
+  })
+
+  test('requires a publication URL for growth sources', () => {
+    const client = new SubstackClient({ sessionToken: 'session-value' })
+    expect(() => client.getGrowthSources()).toThrow(SubstackConfigurationError)
+  })
+
   test('creates link attachments and publishes Notes through global write endpoints', async () => {
     const calls: Array<{ method: string; url: string; body: unknown }> = []
     const client = new SubstackClient({

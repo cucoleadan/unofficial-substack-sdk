@@ -11,6 +11,9 @@ import type {
   EmailStatsPage,
   EmailStatsRow,
   FetchLike,
+  GrowthSourceItem,
+  GrowthSourcesOptions,
+  GrowthSourcesResponse,
   NoteComment,
   NoteCommentOptions,
   NoteFeedItem,
@@ -36,6 +39,7 @@ import type {
 } from './types.js'
 import { getActivity, getUnreadActivity } from '../resources/activity/index.js'
 import { getAllEmailStats, getEmailStats } from '../resources/email-stats/index.js'
+import { getGrowthSources } from '../resources/growth/index.js'
 import {
   commentOnNote,
   createAttachment,
@@ -292,8 +296,19 @@ export class SubstackClient {
    * Returns the publication's subscriber records and aggregate subscriber count.
    * The response may include subscriber personal data, including email addresses.
    */
-  getSubscriberStats<T = unknown>(): Promise<SubscriberStatsResponse<T>> {
+  getSubscriberStats<T = unknown>(): Promise<SubscriberStatsResponse<T> | Record<string, unknown>> {
     return getSubscriberStats(this.endpoints)
+  }
+
+  /**
+   * Returns historical traffic, subscriber growth, and revenue breakdown by acquisition source.
+   * A publication URL is required.
+   */
+  getGrowthSources<TSource = GrowthSourceItem>(
+    options: GrowthSourcesOptions = {}
+  ): Promise<GrowthSourcesResponse<TSource>> {
+    this.requirePublicationApiBase()
+    return getGrowthSources(this.endpoints, options)
   }
 
   /**

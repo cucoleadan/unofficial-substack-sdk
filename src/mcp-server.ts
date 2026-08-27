@@ -5,7 +5,8 @@ import {
   SubstackClient,
   SubstackConfigurationError,
   type EmailStatsOptions,
-  type EmailStatsRow
+  type EmailStatsRow,
+  type GrowthSourcesOptions
 } from './index.js'
 
 type ReadOnlyClient = Pick<
@@ -22,6 +23,7 @@ type ReadOnlyClient = Pick<
   | 'getSubscriberStats'
   | 'getActivity'
   | 'getUnreadActivity'
+  | 'getGrowthSources'
 >
 
 type ToolResult = {
@@ -47,6 +49,9 @@ const emailRowLimit = z.number().int().min(1).max(20).default(20)
 const rawRowLimit = z.number().int().min(1).max(200).default(20)
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD.')
 const orderDirection = z.enum(['asc', 'desc']).default('desc')
+const growthSourcesOrderBy = z
+  .enum(['users', 'subscriptions', 'annual_subscriptions', 'revenue'])
+  .default('users')
 const activityFilter = z.enum(['all', 'replies-and-mentions', 'restacks']).default('all')
 const topMetrics = [
   'opens',
@@ -373,12 +378,33 @@ export function createToolHandlers(client: ReadOnlyClient) {
       run(async () => capped(await client.getActivity(filter), maximum)),
     getUnreadActivity: (maximum = 20) =>
       run(async () => capped(await client.getUnreadActivity(), maximum)),
-    analyzeContent: (postId: string | number) => getPostAnalytics(postId, 0, false)
+    analyzeContent: (postId: string | number) => getPostAnalytics(postId, 0, false),
+    getSubscriberStats: async (): Promise<ToolResult> => {
+      try {
+        const stats = await client.getSubscriberStats()
+        return {
+          content: [{ type: 'text', text: JSON.stringify(stats, null, 2) }],
+          structuredContent: stats as Record<string, unknown>
+        }
+      } catch (error: any) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `Failed to fetch subscriber stats: ${error.message}` }]
+        }
+      }
+    },
+    getGrowthSources: (options: GrowthSourcesOptions = {}) =>
+      run(async () => {
+        if (options.fromDate && options.toDate && options.fromDate > options.toDate) {
+          throw new SubstackConfigurationError('Growth sources fromDate cannot be after toDate.')
+        }
+        return client.getGrowthSources(options)
+      })
   }
 }
 
 export function createMcpServer(client: ReadOnlyClient): McpServer {
-  const server = new McpServer({ name: 'substack-mcp', version: '0.3.4' })
+  const server = new McpServer({ name: 'substack-mcp', version: '0.3.5' })
   const tools = createToolHandlers(client)
 
   server.registerTool(
@@ -546,6 +572,17 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
     ({ include_records, record_limit }) => tools.getSubscriberSummary(include_records, record_limit)
   )
   server.registerTool(
+    'get_subscriber_stats',
+    {
+      title: 'Get subscriber stats',
+      description:
+        'Get publication subscriber statistics or delivery-derived stats if subscriber-stats is unavailable.',
+      outputSchema,
+      annotations: readOnlyAnnotations
+    },
+    () => tools.getSubscriberStats()
+  )
+  server.registerTool(
     'get_activity',
     {
       title: 'Get Substack activity',
@@ -578,6 +615,29 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
       annotations: readOnlyAnnotations
     },
     ({ post_id }) => tools.analyzeContent(post_id)
+  )
+  server.registerTool(
+    'get_growth_sources',
+    {
+      title: 'Get growth and traffic sources',
+      description:
+        'Get historical breakdown of publication traffic, subscriber acquisition, and revenue by referrer / growth channel over a date range.',
+      inputSchema: {
+        from_date: date.optional(),
+        to_date: date.optional(),
+        order_by: growthSourcesOrderBy,
+        order_direction: orderDirection
+      },
+      outputSchema,
+      annotations: readOnlyAnnotations
+    },
+    ({ from_date, to_date, order_by, order_direction }) =>
+      tools.getGrowthSources({
+        fromDate: from_date,
+        toDate: to_date,
+        orderBy: order_by,
+        orderDirection: order_direction
+      })
   )
 
   return server
