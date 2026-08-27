@@ -253,6 +253,9 @@ export interface EmailStatsOptions {
 }
 
 /** One raw row from the publication email statistics endpoint. */
+export type EmailStatsItem = EmailStatsRow
+
+/** One raw row from the publication email statistics endpoint. */
 export interface EmailStatsRow {
   post_id?: number
   title?: string
@@ -468,4 +471,59 @@ export type ActivityFeed = {
 export type UnreadActivityFeed = ActivityFeed & {
   activityItems: unknown[]
   unread: UnreadActivityMetadata
+}
+
+export interface GrowthSourcesOptions {
+  /** Start date in YYYY-MM-DD format. */
+  fromDate?: string
+  /** End date in YYYY-MM-DD format. */
+  toDate?: string
+  /** Upstream metric to order by. Defaults to `users`. */
+  orderBy?: 'users' | 'subscriptions' | 'annual_subscriptions' | 'revenue' | string
+  /** Sort direction. Defaults to `desc`. */
+  orderDirection?: 'asc' | 'desc'
+}
+
+export interface GrowthMetricTimeseriesPoint {
+  date: string
+  value: number
+  [key: string]: unknown
+}
+
+export interface GrowthMetric {
+  name: 'Traffic' | 'Subscribers' | 'Revenue' | string
+  timeseries?: GrowthMetricTimeseriesPoint[]
+  total?: number
+  [key: string]: unknown
+}
+
+export interface GrowthSourceItem {
+  source?: string
+  sourceName?: string
+  originalSourceName?: string
+  category?: string
+  logoUrl?: string
+  href?: string
+  pubId?: number
+  noteId?: string
+  isAggregation?: boolean
+  metrics?: GrowthMetric[]
+  children?: GrowthSourceItem[]
+  [key: string]: unknown
+}
+
+export interface GrowthTotalItem {
+  name?: 'traffic' | 'subscribers' | 'revenue' | string
+  total?: number
+  [key: string]: unknown
+}
+
+/** Response from Substack's publication growth sources endpoint. */
+export type GrowthSourcesResponse<
+  TSource = GrowthSourceItem,
+  TTotal = GrowthTotalItem
+> = {
+  sourceMetrics?: TSource[]
+  totals?: TTotal[]
+  [key: string]: unknown
 }

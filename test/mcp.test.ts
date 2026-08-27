@@ -79,6 +79,10 @@ const mockClient = (overrides: Record<string, unknown> = {}) => ({
     activityItems: [{ id: 1 }, { id: 2 }],
     unread: { count: 2, strategy: 'latest-activity-items' }
   }),
+  getGrowthSources: async () => ({
+    sourceMetrics: [{ source: 'substack', sourceName: 'Substack' }],
+    totals: [{ name: 'traffic', total: 149 }]
+  }),
   ...overrides
 })
 
@@ -254,6 +258,58 @@ describe('MCP tools', () => {
       personalDataIncluded: true,
       subscribers: [{ user_id: 1, user_email_address: 'one@example.com' }]
     })
+  })
+
+  test('returns clean structured content and text for subscriber stats', async () => {
+    const tools = createToolHandlers(mockClient() as never)
+    const result = await tools.getSubscriberStats()
+
+    expect(result.isError).toBeUndefined()
+    expect(result.structuredContent).toMatchObject({ total: 2 })
+    expect(result.content[0].type).toBe('text')
+    expect(JSON.parse(result.content[0].text)).toMatchObject({ total: 2 })
+  })
+
+  test('handles errors cleanly in getSubscriberStats tool', async () => {
+    const tools = createToolHandlers(
+      mockClient({
+        getSubscriberStats: async () => {
+          throw new Error('Network timeout')
+        }
+      }) as never
+    )
+    const result = await tools.getSubscriberStats()
+
+    expect(result.isError).toBe(true)
+    expect(result.content[0].text).toBe('Failed to fetch subscriber stats: Network timeout')
+  })
+
+  test('returns growth sources structured content from tool handler', async () => {
+    const tools = createToolHandlers(mockClient() as never)
+    const result = await tools.getGrowthSources({
+      fromDate: '2026-07-29',
+      toDate: '2026-08-27',
+      orderBy: 'users'
+    })
+
+    expect(result.isError).toBeUndefined()
+    expect(result.structuredContent).toEqual({
+      data: {
+        sourceMetrics: [{ source: 'substack', sourceName: 'Substack' }],
+        totals: [{ name: 'traffic', total: 149 }]
+      }
+    })
+  })
+
+  test('rejects an inverted growth sources date range', async () => {
+    const tools = createToolHandlers(mockClient() as never)
+    const result = await tools.getGrowthSources({
+      fromDate: '2026-08-27',
+      toDate: '2026-07-29'
+    })
+
+    expect(result.isError).toBe(true)
+    expect(result.content[0].text).toContain('fromDate cannot be after toDate')
   })
 
   test('caps activity while retaining unread metadata', async () => {
