@@ -179,7 +179,20 @@ describe('MCP tools', () => {
         cursor: null
       }
     })
-    expect(result.content[0].text).toBe('Returned 3 items.')
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      data: {
+        items: [
+          { id: 1, body: 'First body' },
+          { id: 2, body: 'Second body' },
+          { id: 3, body: 'Final body' }
+        ],
+        returned: 3,
+        pages_fetched: 2,
+        complete: true,
+        has_more: false,
+        cursor: null
+      }
+    })
   })
 
   test('stops fetch-all collection at max_items with a resumable cursor', async () => {
@@ -456,7 +469,7 @@ describe('MCP tools', () => {
     expect(result.isError).toBeUndefined()
     expect(result.structuredContent).toEqual({ data: { total_subscribers: 2 } })
     expect(result.content[0].type).toBe('text')
-    expect(result.content[0].text).toBe('Request completed successfully.')
+    expect(JSON.parse(result.content[0].text)).toEqual({ data: { total_subscribers: 2 } })
   })
 
   test('handles errors cleanly in getSubscriberStats tool', async () => {
@@ -547,6 +560,41 @@ describe('MCP tools', () => {
 
     expect(response.isError).toBe(true)
     expect(response.content[0].text).toContain('authentication failed')
+  })
+
+  test('registers both snake_case and camelCase aliases for all tools', () => {
+    const server = createMcpServer(mockClient() as never)
+    const registeredTools = Object.keys((server as any)._registeredTools ?? {})
+    expect(registeredTools).toContain('get_notes')
+    expect(registeredTools).toContain('getNotes')
+    expect(registeredTools).toContain('get_profile_notes')
+    expect(registeredTools).toContain('getProfileNotes')
+    expect(registeredTools).toContain('get_authenticated_profile')
+    expect(registeredTools).toContain('getAuthenticatedProfile')
+    expect(registeredTools).toContain('get_recent_posts')
+    expect(registeredTools).toContain('getRecentPosts')
+    expect(registeredTools).toContain('get_email_stats')
+    expect(registeredTools).toContain('getEmailStats')
+    expect(registeredTools).toContain('get_publication_analytics')
+    expect(registeredTools).toContain('getPublicationAnalytics')
+    expect(registeredTools).toContain('get_post_engagement')
+    expect(registeredTools).toContain('getPostEngagement')
+    expect(registeredTools).toContain('get_post_analytics')
+    expect(registeredTools).toContain('getPostAnalytics')
+    expect(registeredTools).toContain('get_note_engagement')
+    expect(registeredTools).toContain('getNoteEngagement')
+    expect(registeredTools).toContain('get_subscriber_summary')
+    expect(registeredTools).toContain('getSubscriberSummary')
+    expect(registeredTools).toContain('get_subscriber_stats')
+    expect(registeredTools).toContain('getSubscriberStats')
+    expect(registeredTools).toContain('get_activity')
+    expect(registeredTools).toContain('getActivity')
+    expect(registeredTools).toContain('get_unread_activity')
+    expect(registeredTools).toContain('getUnreadActivity')
+    expect(registeredTools).toContain('analyze_content')
+    expect(registeredTools).toContain('analyzeContent')
+    expect(registeredTools).toContain('get_growth_sources')
+    expect(registeredTools).toContain('getGrowthSources')
   })
 
   test('requires both environment variables', () => {

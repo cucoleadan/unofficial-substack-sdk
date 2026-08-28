@@ -354,17 +354,8 @@ const growthSourcesGranularity = z
 
 function result(data: unknown): ToolResult {
   const output = { data }
-  const record = isRecord(data) ? data : undefined
-  const collectionKey = record
-    ? ['items', 'posts', 'rows', 'activityItems', 'comments', 'replies', 'top_posts', 'subscribers'].find(
-        (key) => Array.isArray(record[key])
-      )
-    : undefined
-  const summary = collectionKey
-    ? `Returned ${(record?.[collectionKey] as unknown[]).length} ${collectionKey}.`
-    : 'Request completed successfully.'
   return {
-    content: [{ type: 'text', text: summary }],
+    content: [{ type: 'text', text: JSON.stringify(output, null, 2) }],
     structuredContent: output
   }
 }
@@ -955,11 +946,25 @@ export function createToolHandlers(client: ReadOnlyClient) {
 }
 
 export function createMcpServer(client: ReadOnlyClient): McpServer {
-  const server = new McpServer({ name: 'substack-mcp', version: '0.3.10' })
+  const server = new McpServer({ name: 'substack-mcp', version: '0.3.11' })
   const tools = createToolHandlers(client)
 
-  server.registerTool(
-    'get_authenticated_profile',
+  const register = (
+    names: readonly string[],
+    definition: Record<string, unknown>,
+    handler?: (...args: any[]) => unknown
+  ) => {
+    for (const name of names) {
+      if (handler) {
+        ;(server as any).registerTool(name, definition, handler)
+      } else {
+        ;(server as any).registerTool(name, definition)
+      }
+    }
+  }
+
+  register(
+    ['get_authenticated_profile', 'getAuthenticatedProfile'],
     {
       title: 'Get authenticated Substack profile',
       description: 'Get the authenticated profile, including the profile ID needed by profile tools.',
@@ -968,19 +973,23 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
     },
     () => tools.getAuthenticatedProfile()
   )
-  server.registerTool(
-    'get_recent_posts',
+  register(
+    ['get_recent_posts', 'getRecentPosts'],
     {
       title: 'Get recent posts',
       description: 'Get recent posts for a Substack profile.',
-      inputSchema: { profile_id: id, limit },
+      inputSchema: {
+        profile_id: id.optional(),
+        profileId: id.optional(),
+        limit
+      },
       outputSchema: recentPostsOutputSchema,
       annotations: readOnlyAnnotations
     },
-    ({ profile_id, limit }) => tools.getRecentPosts(profile_id, limit)
+    (args: any) => tools.getRecentPosts(args.profile_id ?? args.profileId, args.limit)
   )
-  server.registerTool(
-    'get_email_stats',
+  register(
+    ['get_email_stats', 'getEmailStats'],
     {
       title: 'Get one email statistics page',
       description:
@@ -989,16 +998,25 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
         offset: z.number().int().nonnegative().default(0),
         limit: emailRowLimit,
         order_by: z.string().min(1).default('post_date'),
-        order_direction: orderDirection
+        orderBy: z.string().min(1).optional(),
+        order_direction: orderDirection,
+        orderDirection: orderDirection.optional()
       },
       outputSchema: emailStatsOutputSchema,
       annotations: readOnlyAnnotations
     },
-    ({ offset, limit, order_by, order_direction }) =>
-      tools.getEmailStats({ offset, orderBy: order_by, orderDirection: order_direction }, limit)
+    (args: any) =>
+      tools.getEmailStats(
+        {
+          offset: args.offset,
+          orderBy: args.order_by ?? args.orderBy ?? 'post_date',
+          orderDirection: args.order_direction ?? args.orderDirection ?? 'desc'
+        },
+        args.limit
+      )
   )
-  server.registerTool(
-    'get_publication_analytics',
+  register(
+    ['get_publication_analytics', 'getPublicationAnalytics'],
     {
       title: 'Analyze publication performance',
       description:
@@ -1006,140 +1024,185 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
       inputSchema: {
         offset: z.number().int().nonnegative().default(0),
         from_date: date.optional(),
+        fromDate: date.optional(),
         to_date: date.optional(),
+        toDate: date.optional(),
         order_by: z.string().min(1).default('post_date'),
+        orderBy: z.string().min(1).optional(),
         order_direction: orderDirection,
+        orderDirection: orderDirection.optional(),
         top_metric: z.enum(topMetrics).default('engagement_rate'),
+        topMetric: z.enum(topMetrics).optional(),
         top_limit: z.number().int().min(1).max(50).default(10),
+        topLimit: z.number().int().min(1).max(50).optional(),
         include_rows: z.boolean().default(false),
-        row_limit: rawRowLimit
+        includeRows: z.boolean().default(false),
+        row_limit: rawRowLimit,
+        rowLimit: rawRowLimit.optional()
       },
       outputSchema: publicationAnalyticsOutputSchema,
       annotations: readOnlyAnnotations
     },
-    ({
-      offset,
-      from_date,
-      to_date,
-      order_by,
-      order_direction,
-      top_metric,
-      top_limit,
-      include_rows,
-      row_limit
-    }) =>
+    (args: any) =>
       tools.getPublicationAnalytics({
-        offset,
-        fromDate: from_date,
-        toDate: to_date,
-        orderBy: order_by,
-        orderDirection: order_direction,
-        topMetric: top_metric,
-        topLimit: top_limit,
-        includeRows: include_rows,
-        rowLimit: row_limit
+        offset: args.offset,
+        fromDate: args.from_date ?? args.fromDate,
+        toDate: args.to_date ?? args.toDate,
+        orderBy: args.order_by ?? args.orderBy ?? 'post_date',
+        orderDirection: args.order_direction ?? args.orderDirection ?? 'desc',
+        topMetric: args.top_metric ?? args.topMetric ?? 'engagement_rate',
+        topLimit: args.top_limit ?? args.topLimit ?? 10,
+        includeRows: args.include_rows ?? args.includeRows ?? false,
+        rowLimit: args.row_limit ?? args.rowLimit ?? 20
       })
   )
-  server.registerTool(
-    'get_post_engagement',
+  register(
+    ['get_post_engagement', 'getPostEngagement'],
     {
       title: 'Get post engagement',
       description: 'Get a post, its visible comments, and content engagement totals.',
-      inputSchema: { post_id: id, comment_limit: limit },
+      inputSchema: {
+        post_id: id.optional(),
+        postId: id.optional(),
+        comment_limit: limit,
+        commentLimit: limit.optional()
+      },
       outputSchema: postEngagementOutputSchema,
       annotations: readOnlyAnnotations
     },
-    ({ post_id, comment_limit }) => tools.getPostEngagement(post_id, comment_limit)
+    (args: any) =>
+      tools.getPostEngagement(
+        args.post_id ?? args.postId,
+        args.comment_limit ?? args.commentLimit
+      )
   )
-  server.registerTool(
-    'get_post_analytics',
+  register(
+    ['get_post_analytics', 'getPostAnalytics'],
     {
       title: 'Get complete post analytics',
       description:
         'Combine author analytics with visible post and comment engagement, including delivery, conversion, media, link, referrer, daily, and comparison data when available.',
       inputSchema: {
-        post_id: id,
+        post_id: id.optional(),
+        postId: id.optional(),
         comment_limit: limit,
-        include_raw: z.boolean().default(false)
+        commentLimit: limit.optional(),
+        include_raw: z.boolean().default(false),
+        includeRaw: z.boolean().default(false)
       },
       outputSchema: postAnalyticsOutputSchema,
       annotations: readOnlyAnnotations
     },
-    ({ post_id, comment_limit, include_raw }) =>
-      tools.getPostAnalytics(post_id, comment_limit, include_raw)
+    (args: any) =>
+      tools.getPostAnalytics(
+        args.post_id ?? args.postId,
+        args.comment_limit ?? args.commentLimit,
+        args.include_raw ?? args.includeRaw
+      )
   )
-  server.registerTool(
-    'get_notes',
+  register(
+    ['get_notes', 'getNotes'],
     {
       title: 'Get publication Notes',
       description:
         'Get compact, body-first Notes from the authenticated profile or a specified profile ID. Set fetch_all to follow pagination safely up to max_items.',
       inputSchema: {
         profile_id: id.optional(),
+        profileId: id.optional(),
         cursor: z.string().optional(),
         limit: noteLimit,
         fetch_all: fetchAll,
-        max_items: maxNoteItems
+        fetchAll: fetchAll.optional(),
+        max_items: maxNoteItems,
+        maxItems: maxNoteItems.optional()
       },
       outputSchema: notesOutputSchema,
       annotations: readOnlyAnnotations
     },
-    ({ profile_id, cursor, limit, fetch_all, max_items }) =>
-      tools.getNotes(cursor, limit, profile_id, fetch_all, max_items)
+    (args: any) =>
+      tools.getNotes(
+        args.cursor,
+        args.limit,
+        args.profile_id ?? args.profileId,
+        args.fetch_all ?? args.fetchAll,
+        args.max_items ?? args.maxItems
+      )
   )
-  server.registerTool(
-    'get_profile_notes',
+  register(
+    ['get_profile_notes', 'getProfileNotes'],
     {
       title: 'Get profile Notes',
       description:
         'Get compact, body-first Notes for a profile. Set fetch_all to follow pagination safely up to max_items.',
       inputSchema: {
-        profile_id: id,
+        profile_id: id.optional(),
+        profileId: id.optional(),
         cursor: z.string().optional(),
         limit: noteLimit,
         fetch_all: fetchAll,
-        max_items: maxNoteItems
+        fetchAll: fetchAll.optional(),
+        max_items: maxNoteItems,
+        maxItems: maxNoteItems.optional()
       },
       outputSchema: profileNotesOutputSchema,
       annotations: readOnlyAnnotations
     },
-    ({ profile_id, cursor, limit, fetch_all, max_items }) =>
-      tools.getProfileNotes(profile_id, cursor, limit, fetch_all, max_items)
+    (args: any) =>
+      tools.getProfileNotes(
+        args.profile_id ?? args.profileId,
+        args.cursor,
+        args.limit,
+        args.fetch_all ?? args.fetchAll,
+        args.max_items ?? args.maxItems
+      )
   )
-  server.registerTool(
-    'get_note_engagement',
+  register(
+    ['get_note_engagement', 'getNoteEngagement'],
     {
       title: 'Get complete Note engagement',
       description:
         'Get Note reactions, restacks, viewer state, and fully paginated visible direct, nested, and total reply counts. Note views are returned only if Substack supplies them.',
       inputSchema: {
-        note_id: id,
+        note_id: id.optional(),
+        noteId: id.optional(),
         reply_limit: limit,
-        include_raw_pages: z.boolean().default(false)
+        replyLimit: limit.optional(),
+        include_raw_pages: z.boolean().default(false),
+        includeRawPages: z.boolean().default(false)
       },
       outputSchema: noteEngagementOutputSchema,
       annotations: readOnlyAnnotations
     },
-    ({ note_id, reply_limit, include_raw_pages }) =>
-      tools.getNoteEngagement(note_id, reply_limit, include_raw_pages)
+    (args: any) =>
+      tools.getNoteEngagement(
+        args.note_id ?? args.noteId,
+        args.reply_limit ?? args.replyLimit,
+        args.include_raw_pages ?? args.includeRawPages
+      )
   )
-  server.registerTool(
-    'get_subscriber_summary',
+  register(
+    ['get_subscriber_summary', 'getSubscriberSummary'],
     {
       title: 'Get subscriber analytics',
       description:
         'Get a privacy-safe subscriber count and upstream aggregate fields. Raw subscriber records can contain personal data and are returned only when explicitly requested.',
       inputSchema: {
         include_records: z.boolean().default(false),
-        record_limit: rawRowLimit
+        includeRecords: z.boolean().default(false),
+        record_limit: rawRowLimit,
+        recordLimit: rawRowLimit.optional()
       },
       outputSchema: subscriberSummaryOutputSchema,
       annotations: readOnlyAnnotations
     },
-    ({ include_records, record_limit }) => tools.getSubscriberSummary(include_records, record_limit)
+    (args: any) =>
+      tools.getSubscriberSummary(
+        args.include_records ?? args.includeRecords,
+        args.record_limit ?? args.recordLimit
+      )
   )
-  server.registerTool(
-    'get_subscriber_stats',
+  register(
+    ['get_subscriber_stats', 'getSubscriberStats'],
     {
       title: 'Get subscriber stats',
       description:
@@ -1149,8 +1212,8 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
     },
     () => tools.getSubscriberStats()
   )
-  server.registerTool(
-    'get_activity',
+  register(
+    ['get_activity', 'getActivity'],
     {
       title: 'Get Substack activity',
       description: 'Get bounded authenticated activity for all events, replies and mentions, or restacks.',
@@ -1158,10 +1221,10 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
       outputSchema: activityOutputSchema,
       annotations: readOnlyAnnotations
     },
-    ({ filter, limit }) => tools.getActivity(filter, limit)
+    (args: any) => tools.getActivity(args.filter, args.limit)
   )
-  server.registerTool(
-    'get_unread_activity',
+  register(
+    ['get_unread_activity', 'getUnreadActivity'],
     {
       title: 'Get unread Substack activity',
       description: 'Get bounded unread authenticated activity plus unread-count metadata.',
@@ -1169,22 +1232,25 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
       outputSchema: unreadActivityOutputSchema,
       annotations: readOnlyAnnotations
     },
-    ({ limit }) => tools.getUnreadActivity(limit)
+    (args: any) => tools.getUnreadActivity(args.limit)
   )
-  server.registerTool(
-    'analyze_content',
+  register(
+    ['analyze_content', 'analyzeContent'],
     {
       title: 'Analyze one post',
       description:
         'Return complete author and content engagement analytics for one post without comment or raw-response payloads.',
-      inputSchema: { post_id: id },
+      inputSchema: {
+        post_id: id.optional(),
+        postId: id.optional()
+      },
       outputSchema: analyzeContentOutputSchema,
       annotations: readOnlyAnnotations
     },
-    ({ post_id }) => tools.analyzeContent(post_id)
+    (args: any) => tools.analyzeContent(args.post_id ?? args.postId)
   )
-  server.registerTool(
-    'get_growth_sources',
+  register(
+    ['get_growth_sources', 'getGrowthSources'],
     {
       title: 'Get growth and traffic sources',
       description:
