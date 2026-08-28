@@ -50,6 +50,7 @@ export {
   type PostWithEngagement,
   type PostWithEngagementOptions,
   type ProfileNoteItem,
+  type ProfileNotesOptions,
   type ProfileNotesPage,
   type PublishNoteRequest,
   type ProfilePostsOptions,

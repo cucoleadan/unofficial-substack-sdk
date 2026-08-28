@@ -36,7 +36,12 @@ export interface CursorOptions {
   cursor?: string
 }
 
-export interface NotesOptions extends CursorOptions {
+export interface ProfileNotesOptions extends CursorOptions {
+  /** Requested upstream page size. */
+  limit?: number
+}
+
+export interface NotesOptions extends ProfileNotesOptions {
   profileId?: number | string
 }
 

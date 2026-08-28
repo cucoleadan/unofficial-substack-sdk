@@ -17,6 +17,7 @@ import type {
   NoteRestackOptions,
   NotesOptions,
   NoteWithEngagement,
+  ProfileNotesOptions,
   ProfileNotesPage,
   PublishNoteRequest,
   ScheduleNoteRequest,
@@ -79,10 +80,13 @@ export function getProfileNotes<
 >(
   context: EndpointContext,
   id: number | string,
-  options: CursorOptions = {}
+  options: ProfileNotesOptions = {}
 ): Promise<ProfileNotesPage<T>> {
   const profileId = positiveInteger(id, 'Profile ID')
   const query = new URLSearchParams({ types: 'note' })
+  if (options.limit !== undefined) {
+    query.set('limit', String(positiveInteger(options.limit, 'Profile Notes limit')))
+  }
   if (options.cursor) {
     query.set('cursor', options.cursor)
   }

@@ -28,6 +28,7 @@ import type {
   PostManagementPost,
   PostWithEngagement,
   PostWithEngagementOptions,
+  ProfileNotesOptions,
   ProfileNotesPage,
   PublishNoteRequest,
   ProfilePostsOptions,
@@ -207,7 +208,7 @@ export class SubstackClient {
 
   getProfileNotes<T extends Record<string, unknown> = NoteFeedItem>(
     id: number | string,
-    options: CursorOptions = {}
+    options: ProfileNotesOptions = {}
   ): Promise<ProfileNotesPage<T>> {
     return getProfileNotes<T>(this.endpoints, id, options)
   }
