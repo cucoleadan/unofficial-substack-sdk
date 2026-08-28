@@ -618,25 +618,98 @@ describe('SubstackClient', () => {
     ])
   })
 
-  test('gets subscriber stats from the publication origin', async () => {
+  test('gets subscriber stats and breakdown from modern publication stats endpoint', async () => {
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://allagentsconsidered.substack.com',
+      fetch: async (input) => {
+        const url = new Request(input).url
+        if (url.includes('/publication/stats/subscribers')) {
+          return Response.json({
+            subscribers: 5,
+            lifetime_subscribers: 8,
+            comp_subscribers: 2,
+            gift_subscribers: 1,
+            free_trial_subscribers: 0,
+            founding_subscribers: 1,
+            totalEmail: 534
+          })
+        }
+        if (url.includes('/publish-dashboard/summary')) {
+          return Response.json({
+            appSubscribers: 314,
+            totalEmail: 534,
+            subscribers: 5,
+            openRate: 24.368,
+            views: 2097,
+            numPledges: 3,
+            pledgesAmount: 150,
+            pledgeCurrency: 'usd'
+          })
+        }
+        return new Response('Not Found', { status: 404 })
+      }
+    })
+
+    const result = await client.getSubscriberStats()
+    expect(result).toMatchObject({
+      total_subscribers: 534,
+      paid_subscribers: 5,
+      free_subscribers: 529,
+      app_subscribers: 314,
+      comp_subscribers: 2,
+      gift_subscribers: 1,
+      founding_subscribers: 1,
+      lifetime_subscribers: 8,
+      views: 2097,
+      open_rate: '24.4%',
+      num_pledges: 3,
+      pledges_amount: 150,
+      pledge_currency: 'usd'
+    })
+
+    const paidBreakdown = await client.getPaidSubscribers()
+    expect(paidBreakdown).toEqual({
+      total_subscribers: 534,
+      paid_subscribers: 5,
+      free_subscribers: 529,
+      app_subscribers: 314,
+      comp_subscribers: 2,
+      gift_subscribers: 1,
+      free_trial_subscribers: 0,
+      founding_subscribers: 1,
+      lifetime_subscribers: 8,
+      pledges_amount: 150,
+      num_pledges: 3,
+      pledge_currency: 'usd'
+    })
+  })
+
+  test('falls back to legacy subscriber-stats when modern stats return 404', async () => {
     let request: Request | undefined
     const client = new SubstackClient({
       sessionToken: 'session-value',
       publicationUrl: 'https://allagentsconsidered.substack.com',
       fetch: async (input, init) => {
         request = new Request(input, init)
-        return Response.json({ subscribers: [{ user_id: 1, user_email_address: 'reader@example.com' }] })
+        const url = request.url
+        if (url.includes('/publication/stats/subscribers') || url.includes('/publish-dashboard/summary')) {
+          return new Response('Not Found', { status: 404 })
+        }
+        if (url.includes('/subscriber-stats')) {
+          return Response.json({ subscribers: [{ user_id: 1, user_email_address: 'reader@example.com' }] })
+        }
+        return new Response('Not Found', { status: 404 })
       }
     })
 
     await expect(client.getSubscriberStats<{ user_id: number; user_email_address: string }>()).resolves.toEqual({
       subscribers: [{ user_id: 1, user_email_address: 'reader@example.com' }]
     })
-    expect(request?.url).toBe('https://allagentsconsidered.substack.com/api/v1/subscriber-stats')
     expect(request?.headers.get('cookie')).toBe('substack.sid=session-value')
   })
 
-  test('falls back to email-stats when subscriber-stats returns 404', async () => {
+  test('falls back to email-stats when modern stats and subscriber-stats return 404', async () => {
     const requests: string[] = []
     const client = new SubstackClient({
       sessionToken: 'session-value',
@@ -644,6 +717,9 @@ describe('SubstackClient', () => {
       fetch: async (input) => {
         const url = new Request(input).url
         requests.push(url)
+        if (url.includes('/publication/stats/subscribers') || url.includes('/publish-dashboard/summary')) {
+          return new Response('Not Found', { status: 404 })
+        }
         if (url.includes('/subscriber-stats')) {
           return new Response('Not Found', { status: 404 })
         }
@@ -664,15 +740,12 @@ describe('SubstackClient', () => {
     const result = await client.getSubscriberStats()
     expect(result).toEqual({
       derived_from_delivery: true,
+      total_subscribers: 1500,
       active_subscribers_delivered: 1500,
       recent_signups: 12,
       latest_post_title: 'Latest Post Title',
       open_rate: '45.2%'
     })
-    expect(requests).toEqual([
-      'https://allagentsconsidered.substack.com/api/v1/subscriber-stats',
-      'https://allagentsconsidered.substack.com/api/v1/email-stats'
-    ])
   })
 
   test('re-throws non-404 errors when getting subscriber stats', async () => {

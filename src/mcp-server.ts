@@ -21,6 +21,7 @@ type ReadOnlyClient = Pick<
   | 'getProfileNotes'
   | 'getNoteWithEngagement'
   | 'getSubscriberStats'
+  | 'getPaidSubscribers'
   | 'getActivity'
   | 'getUnreadActivity'
   | 'getGrowthSources'
@@ -234,6 +235,8 @@ const subscriberSummaryOutputSchema = {
   data: z
     .object({
       count: z.number().optional().describe('Total active subscriber count'),
+      paid_subscribers: z.number().optional().describe('Active paying subscriber count'),
+      free_subscribers: z.number().optional().describe('Active free subscriber count'),
       aggregates: z.record(z.string(), z.unknown()).optional().describe('Aggregated subscriber stats'),
       subscribers: z.array(z.record(z.string(), z.unknown())).optional().describe('Raw subscriber records (only when requested)')
     })
@@ -244,11 +247,41 @@ const subscriberStatsOutputSchema = {
   data: z
     .object({
       total_subscribers: z.number().optional().describe('Total subscriber count'),
+      paid_subscribers: z.number().optional().describe('Active paying subscriber count'),
+      free_subscribers: z.number().optional().describe('Active free subscriber count'),
+      app_subscribers: z.number().optional().describe('Substack mobile app subscriber count'),
+      comp_subscribers: z.number().optional().describe('Complimentary subscriber count'),
+      gift_subscribers: z.number().optional().describe('Gift subscriber count'),
+      free_trial_subscribers: z.number().optional().describe('Free trial subscriber count'),
+      founding_subscribers: z.number().optional().describe('Founding member subscriber count'),
+      lifetime_subscribers: z.number().optional().describe('Lifetime subscriber count'),
       active_subscribers_delivered: z.number().optional().describe('Subscribers delivered on latest email'),
       recent_signups: z.number().optional().describe('Recent email signups count'),
-      open_rate: z.number().optional().describe('Open rate percentage'),
+      open_rate: z.union([z.string(), z.number()]).optional().describe('Open rate percentage'),
+      views: z.number().optional().describe('Publication total views'),
+      total_email_last_30_days: z.number().optional().describe('New email subscribers in last 30 days'),
+      app_subscribers_last_30_days: z.number().optional().describe('New app subscribers in last 30 days'),
       latest_post_title: z.string().optional().describe('Title of latest delivered post'),
       derived_from_delivery: z.boolean().optional().describe('Whether stats were derived from email delivery')
+    })
+    .passthrough()
+}
+
+const paidSubscribersOutputSchema = {
+  data: z
+    .object({
+      total_subscribers: z.number().int().nonnegative().describe('Total active subscriber count'),
+      paid_subscribers: z.number().int().nonnegative().describe('Active paying subscriber count'),
+      free_subscribers: z.number().int().nonnegative().describe('Active free subscriber count'),
+      app_subscribers: z.number().int().nonnegative().optional().describe('Substack mobile app subscriber count'),
+      comp_subscribers: z.number().int().nonnegative().optional().describe('Complimentary paid subscriptions'),
+      gift_subscribers: z.number().int().nonnegative().optional().describe('Gifted subscriptions'),
+      free_trial_subscribers: z.number().int().nonnegative().optional().describe('Free trial subscribers'),
+      founding_subscribers: z.number().int().nonnegative().optional().describe('Founding member subscribers'),
+      lifetime_subscribers: z.number().int().nonnegative().optional().describe('Total lifetime subscribers'),
+      pledges_amount: z.number().optional().describe('Total pledge amount'),
+      num_pledges: z.number().int().nonnegative().optional().describe('Number of pledges received'),
+      pledge_currency: z.string().optional().describe('Currency for pledges')
     })
     .passthrough()
 }
@@ -711,7 +744,17 @@ function safeSubscriberMetadata(response: Record<string, unknown>): Record<strin
 }
 
 function subscriberCount(response: Record<string, unknown>, records: unknown[]): number {
-  for (const key of ['total', 'count', 'subscriber_count', 'subscriberCount']) {
+  for (const key of [
+    'total_subscribers',
+    'totalEmail',
+    'totalSubscribers',
+    'totalSubscribersEnd',
+    'total',
+    'count',
+    'subscriber_count',
+    'subscriberCount',
+    'active_subscribers_delivered'
+  ]) {
     const value = finiteNumber(response[key])
     if (value !== undefined && value >= 0) return Math.floor(value)
   }
@@ -722,7 +765,17 @@ function optionalSubscriberCount(
   response: Record<string, unknown>,
   records: unknown[]
 ): number | undefined {
-  for (const key of ['total', 'count', 'subscriber_count', 'subscriberCount']) {
+  for (const key of [
+    'total_subscribers',
+    'totalEmail',
+    'totalSubscribers',
+    'totalSubscribersEnd',
+    'total',
+    'count',
+    'subscriber_count',
+    'subscriberCount',
+    'active_subscribers_delivered'
+  ]) {
     const value = finiteNumber(response[key])
     if (value !== undefined && value >= 0) return Math.floor(value)
   }
@@ -873,8 +926,24 @@ export function createToolHandlers(client: ReadOnlyClient) {
         const response = await client.getSubscriberStats<Record<string, unknown>>()
         const record = isRecord(response) ? response : {}
         const subscribers = Array.isArray(response.subscribers) ? response.subscribers : []
+        const total = subscriberCount(record, subscribers)
+        const paid =
+          typeof record.paid_subscribers === 'number'
+            ? record.paid_subscribers
+            : typeof record.subscribers === 'number'
+              ? record.subscribers
+              : undefined
+        const free =
+          typeof record.free_subscribers === 'number'
+            ? record.free_subscribers
+            : paid !== undefined
+              ? Math.max(0, total - paid)
+              : undefined
+
         return {
-          count: subscriberCount(record, subscribers),
+          count: total,
+          ...(paid !== undefined ? { paid_subscribers: paid } : {}),
+          ...(free !== undefined ? { free_subscribers: free } : {}),
           records_returned_by_upstream: subscribers.length,
           aggregates: safeSubscriberMetadata(record),
           available_record_fields: [
@@ -925,11 +994,57 @@ export function createToolHandlers(client: ReadOnlyClient) {
         return {
           ...(count !== undefined ? { total_subscribers: count } : {}),
           ...selectDefined(record, [
+            'paid_subscribers',
+            'free_subscribers',
+            'app_subscribers',
+            'comp_subscribers',
+            'gift_subscribers',
+            'free_trial_subscribers',
+            'founding_subscribers',
+            'lifetime_subscribers',
             'active_subscribers_delivered',
             'recent_signups',
             'open_rate',
+            'views',
+            'total_email_last_30_days',
+            'app_subscribers_last_30_days',
             'latest_post_title',
             'derived_from_delivery'
+          ])
+        }
+      }),
+    getPaidSubscribers: () =>
+      run(async () => {
+        if ('getPaidSubscribers' in client && typeof client.getPaidSubscribers === 'function') {
+          return client.getPaidSubscribers()
+        }
+        const response = await client.getSubscriberStats<Record<string, unknown>>()
+        const record = isRecord(response) ? response : {}
+        const total = subscriberCount(record, [])
+        const paid =
+          typeof record.paid_subscribers === 'number'
+            ? record.paid_subscribers
+            : typeof record.subscribers === 'number'
+              ? record.subscribers
+              : 0
+        const free =
+          typeof record.free_subscribers === 'number'
+            ? record.free_subscribers
+            : Math.max(0, total - paid)
+        return {
+          total_subscribers: total,
+          paid_subscribers: paid,
+          free_subscribers: free,
+          ...selectDefined(record, [
+            'app_subscribers',
+            'comp_subscribers',
+            'gift_subscribers',
+            'free_trial_subscribers',
+            'founding_subscribers',
+            'lifetime_subscribers',
+            'num_pledges',
+            'pledges_amount',
+            'pledge_currency'
           ])
         }
       }),
@@ -946,7 +1061,7 @@ export function createToolHandlers(client: ReadOnlyClient) {
 }
 
 export function createMcpServer(client: ReadOnlyClient): McpServer {
-  const server = new McpServer({ name: 'substack-mcp', version: '0.3.11' })
+  const server = new McpServer({ name: 'substack-mcp', version: '0.3.12' })
   const tools = createToolHandlers(client)
 
   const register = (
@@ -1211,6 +1326,17 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
       annotations: readOnlyAnnotations
     },
     () => tools.getSubscriberStats()
+  )
+  register(
+    ['get_paid_subscribers', 'getPaidSubscribers'],
+    {
+      title: 'Get paid subscribers breakdown',
+      description:
+        'Get a structured breakdown of paid vs free subscribers, subscription tiers (comp, gift, trial, founding), pledges, and ARR metrics.',
+      outputSchema: paidSubscribersOutputSchema,
+      annotations: readOnlyAnnotations
+    },
+    () => tools.getPaidSubscribers()
   )
   register(
     ['get_activity', 'getActivity'],
