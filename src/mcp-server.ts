@@ -545,8 +545,8 @@ export function createToolHandlers(client: ReadOnlyClient) {
         return { post, engagement, comments: commentItems.slice(0, maximum) }
       }),
     getPostAnalytics,
-    getNotes: (cursor: string | undefined, maximum = 20) =>
-      run(async () => capped(await client.getNotes({ cursor }), maximum)),
+    getNotes: (cursor: string | undefined, maximum = 20, profileId?: string | number) =>
+      run(async () => capped(await client.getNotes({ cursor, profileId }), maximum)),
     getProfileNotes: (profileId: string | number, cursor: string | undefined, maximum = 20) =>
       run(async () => capped(await client.getProfileNotes(profileId, { cursor }), maximum)),
     getNoteEngagement: (
@@ -615,7 +615,7 @@ export function createToolHandlers(client: ReadOnlyClient) {
 }
 
 export function createMcpServer(client: ReadOnlyClient): McpServer {
-  const server = new McpServer({ name: 'substack-mcp', version: '0.3.8' })
+  const server = new McpServer({ name: 'substack-mcp', version: '0.3.9' })
   const tools = createToolHandlers(client)
 
   server.registerTool(
@@ -732,12 +732,13 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
     'get_notes',
     {
       title: 'Get publication Notes',
-      description: 'Get a bounded page of authenticated publication Notes.',
-      inputSchema: { cursor: z.string().optional(), limit },
+      description:
+        'Get a bounded page of Notes from the authenticated publication/profile feed or a specified profile ID.',
+      inputSchema: { profile_id: id.optional(), cursor: z.string().optional(), limit },
       outputSchema: notesOutputSchema,
       annotations: readOnlyAnnotations
     },
-    ({ cursor, limit }) => tools.getNotes(cursor, limit)
+    ({ profile_id, cursor, limit }) => tools.getNotes(cursor, limit, profile_id)
   )
   server.registerTool(
     'get_profile_notes',

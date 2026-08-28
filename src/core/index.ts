@@ -40,6 +40,7 @@ export {
   type NoteRepliesResponse,
   type NoteResponse,
   type NoteRestackOptions,
+  type NotesOptions,
   type NoteTrackingParameters,
   type NoteWithEngagement,
   type PostEngagement,
