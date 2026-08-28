@@ -358,9 +358,41 @@ export type PostManagementDetail<TPost = PostManagementPost> = {
   [key: string]: unknown
 }
 
-/** An unmodified response from Substack's publication subscriber statistics endpoint. */
+/** An unmodified or normalized response from Substack's publication subscriber statistics endpoint. */
 export type SubscriberStatsResponse<T = unknown> = {
-  subscribers?: T[]
+  total_subscribers?: number
+  paid_subscribers?: number
+  free_subscribers?: number
+  app_subscribers?: number
+  comp_subscribers?: number
+  gift_subscribers?: number
+  free_trial_subscribers?: number
+  founding_subscribers?: number
+  lifetime_subscribers?: number
+  totalEmail?: number
+  subscribers?: T[] | number
+  active_subscribers_delivered?: number
+  derived_from_delivery?: boolean
+  recent_signups?: number
+  open_rate?: string | number
+  views?: number
+  [key: string]: unknown
+}
+
+/** Publication paid subscribers and subscription tier breakdown. */
+export interface PaidSubscribersBreakdown {
+  total_subscribers: number
+  paid_subscribers: number
+  free_subscribers: number
+  app_subscribers?: number
+  comp_subscribers?: number
+  gift_subscribers?: number
+  free_trial_subscribers?: number
+  founding_subscribers?: number
+  lifetime_subscribers?: number
+  pledges_amount?: number
+  num_pledges?: number
+  pledge_currency?: string
   [key: string]: unknown
 }
 

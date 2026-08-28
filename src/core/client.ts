@@ -24,6 +24,7 @@ import type {
   NoteRestackOptions,
   NotesOptions,
   NoteWithEngagement,
+  PaidSubscribersBreakdown,
   PostManagementDetail,
   PostManagementPost,
   PostWithEngagement,
@@ -71,7 +72,7 @@ import {
   getProfilePosts,
   getPublicProfile
 } from '../resources/profiles/index.js'
-import { getSubscriberStats } from '../resources/subscriber-stats/index.js'
+import { getPaidSubscribers, getSubscriberStats } from '../resources/subscriber-stats/index.js'
 
 const DEFAULT_BASE_URL = 'https://substack.com'
 const DEFAULT_SESSION_COOKIE_NAME = 'substack.sid'
@@ -302,6 +303,14 @@ export class SubstackClient {
    */
   getSubscriberStats<T = unknown>(): Promise<SubscriberStatsResponse<T> | Record<string, unknown>> {
     return getSubscriberStats(this.endpoints)
+  }
+
+  /**
+   * Returns a structured breakdown of publication paid subscribers, including
+   * complimentary, gift, trial, and founding members, along with pledge details.
+   */
+  getPaidSubscribers(): Promise<PaidSubscribersBreakdown | Record<string, unknown>> {
+    return getPaidSubscribers(this.endpoints)
   }
 
   /**

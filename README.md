@@ -71,6 +71,8 @@ Keep the session token local and out of source control. All MCP tools are read-o
 | `get_profile_notes` | Compact, body-first profile Notes with cursor paging or guarded `fetch_all`. |
 | `get_note_engagement` | Reactions, restacks, viewer state, and fully paginated direct/nested reply totals. |
 | `get_subscriber_summary` | Privacy-safe subscriber totals. Raw records require explicit `include_records: true`. |
+| `get_subscriber_stats` | Normalized publication subscriber statistics and tier breakdown. |
+| `get_paid_subscribers` | Structured breakdown of paid vs free subscribers, subscription tiers (comp, gift, trial, founding), and pledges. |
 | `get_activity` | Bounded activity filtered by all events, replies and mentions, or restacks. |
 | `get_unread_activity` | Bounded unread activity plus unread metadata. |
 | `analyze_content` | Compact complete analytics for one post without comment or raw-response payloads. |
@@ -92,7 +94,8 @@ Keep the session token local and out of source control. All MCP tools are read-o
 | `getPostComments(id)` | Comments for a post. |
 | `getEmailStats({ offset, orderBy, orderDirection })` | Publication email delivery and engagement stats. Uses Substack's required fixed page size of 20. Requires a publication administrator session. |
 | `getAllEmailStats({ offset, orderBy, orderDirection })` | Fetches every 20-row email-stat page and returns one flat array of rows. |
-| `getSubscriberStats()` | Publication subscriber records and aggregate count. The response may contain subscriber personal data. |
+| `getSubscriberStats()` | Publication subscriber records, tier breakdown, and aggregate count. |
+| `getPaidSubscribers()` | Structured breakdown of paid vs free subscribers, subscription tiers, and pledges. |
 | `getNotes({ cursor, profileId })` | Authenticated profile Notes feed (resolves profile ID automatically if omitted). |
 | `getDraftNotes({ limit })` | Scheduled Note drafts for the authenticated account. Defaults to 20. |
 | `getNote(id)` | Raw, typed Note by ID. |

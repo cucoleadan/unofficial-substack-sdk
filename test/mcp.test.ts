@@ -81,6 +81,9 @@ const mockClient = (overrides: Record<string, unknown> = {}) => ({
     }
   }),
   getSubscriberStats: async () => ({
+    total_subscribers: 2,
+    paid_subscribers: 1,
+    free_subscribers: 1,
     total: 2,
     has_more: false,
     publication_name: 'Private publication metadata',
@@ -88,6 +91,13 @@ const mockClient = (overrides: Record<string, unknown> = {}) => ({
       { user_id: 1, user_email_address: 'one@example.com' },
       { user_id: 2, user_email_address: 'two@example.com' }
     ]
+  }),
+  getPaidSubscribers: async () => ({
+    total_subscribers: 2,
+    paid_subscribers: 1,
+    free_subscribers: 1,
+    comp_subscribers: 0,
+    founding_subscribers: 0
   }),
   getActivity: async () => ({ activityItems: [{ id: 1 }, { id: 2 }] }),
   getUnreadActivity: async () => ({
@@ -449,14 +459,24 @@ describe('MCP tools', () => {
 
     expect(safe).toEqual({
       count: 2,
+      paid_subscribers: 1,
+      free_subscribers: 1,
       records_returned_by_upstream: 2,
-      aggregates: { total: 2, has_more: false },
+      aggregates: {
+        total_subscribers: 2,
+        paid_subscribers: 1,
+        free_subscribers: 1,
+        total: 2,
+        has_more: false
+      },
       available_record_fields: ['user_email_address', 'user_id'],
       personal_data_included: false
     })
     expect(safe).not.toHaveProperty('subscribers')
     expect(optedIn).toMatchObject({
       count: 2,
+      paid_subscribers: 1,
+      free_subscribers: 1,
       personal_data_included: true,
       subscribers: [{ user_id: 1, user_email_address: 'one@example.com' }]
     })
@@ -467,9 +487,37 @@ describe('MCP tools', () => {
     const result = await tools.getSubscriberStats()
 
     expect(result.isError).toBeUndefined()
-    expect(result.structuredContent).toEqual({ data: { total_subscribers: 2 } })
+    expect(result.structuredContent).toEqual({
+      data: {
+        total_subscribers: 2,
+        paid_subscribers: 1,
+        free_subscribers: 1
+      }
+    })
     expect(result.content[0].type).toBe('text')
-    expect(JSON.parse(result.content[0].text)).toEqual({ data: { total_subscribers: 2 } })
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      data: {
+        total_subscribers: 2,
+        paid_subscribers: 1,
+        free_subscribers: 1
+      }
+    })
+  })
+
+  test('returns clean structured content for getPaidSubscribers tool', async () => {
+    const tools = createToolHandlers(mockClient() as never)
+    const result = await tools.getPaidSubscribers()
+
+    expect(result.isError).toBeUndefined()
+    expect(result.structuredContent).toEqual({
+      data: {
+        total_subscribers: 2,
+        paid_subscribers: 1,
+        free_subscribers: 1,
+        comp_subscribers: 0,
+        founding_subscribers: 0
+      }
+    })
   })
 
   test('handles errors cleanly in getSubscriberStats tool', async () => {
@@ -587,6 +635,8 @@ describe('MCP tools', () => {
     expect(registeredTools).toContain('getSubscriberSummary')
     expect(registeredTools).toContain('get_subscriber_stats')
     expect(registeredTools).toContain('getSubscriberStats')
+    expect(registeredTools).toContain('get_paid_subscribers')
+    expect(registeredTools).toContain('getPaidSubscribers')
     expect(registeredTools).toContain('get_activity')
     expect(registeredTools).toContain('getActivity')
     expect(registeredTools).toContain('get_unread_activity')

@@ -43,6 +43,7 @@ export {
   type NotesOptions,
   type NoteTrackingParameters,
   type NoteWithEngagement,
+  type PaidSubscribersBreakdown,
   type PostEngagement,
   type PostManagementDetail,
   type PostManagementPost,
