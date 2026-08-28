@@ -246,10 +246,40 @@ describe('SubstackClient', () => {
       }
     })
 
-    await client.getNotes()
+    await client.getProfileNotes(123)
 
-    expect(request?.url).toBe('https://newsletter.example.com/api/v1/notes')
+    expect(request?.url).toBe('https://newsletter.example.com/api/v1/reader/feed/profile/123?types=note')
     expect(request?.headers.get('cookie')).toBe('substack.sid=session-value')
+  })
+
+  test('resolves authenticated profile and fetches profile Notes feed', async () => {
+    const urls: string[] = []
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://newsletter.example.com',
+      fetch: async (input, init) => {
+        const req = new Request(input, init)
+        urls.push(req.url)
+        if (req.url.endsWith('/handle/options')) {
+          return Response.json({
+            potentialHandles: [{ handle: 'authorhandle', type: 'existing' }]
+          })
+        }
+        if (req.url.includes('/user/authorhandle/public_profile')) {
+          return Response.json({ id: 12345, handle: 'authorhandle', name: 'Author Name' })
+        }
+        return Response.json({ items: [{ comment: { id: 1 } }] })
+      }
+    })
+
+    const result = await client.getNotes()
+
+    expect(urls).toEqual([
+      'https://substack.com/api/v1/handle/options',
+      'https://substack.com/api/v1/user/authorhandle/public_profile',
+      'https://newsletter.example.com/api/v1/reader/feed/profile/12345?types=note'
+    ])
+    expect(result.items).toHaveLength(1)
   })
 
   test('keeps the global receiver when it uses native fetch', async () => {
@@ -275,7 +305,7 @@ describe('SubstackClient', () => {
     }
   })
 
-  test('uses the publication origin for Notes and encodes cursor values', async () => {
+  test('fetches Notes with explicit profileId and encodes cursor values', async () => {
     let request: Request | undefined
     const client = new SubstackClient({
       sessionToken: 'session-value',
@@ -286,9 +316,11 @@ describe('SubstackClient', () => {
       }
     })
 
-    await client.getNotes({ cursor: 'next page' })
+    await client.getNotes({ profileId: 42, cursor: 'next page' })
 
-    expect(request?.url).toBe('https://allagentsconsidered.substack.com/api/v1/notes?cursor=next%20page')
+    expect(request?.url).toBe(
+      'https://allagentsconsidered.substack.com/api/v1/reader/feed/profile/42?types=note&cursor=next+page'
+    )
   })
 
   test('returns typed profile Notes without changing the upstream response', async () => {
@@ -1232,7 +1264,7 @@ describe('SubstackClient', () => {
 
   test('surfaces configuration and upstream API errors predictably', async () => {
     const noPublication = new SubstackClient({ sessionToken: 'session-value' })
-    expect(() => noPublication.getNotes()).toThrow(SubstackConfigurationError)
+    expect(() => noPublication.getProfileNotes(123)).toThrow(SubstackConfigurationError)
 
     const rejected = new SubstackClient({
       sessionToken: 'session-value',

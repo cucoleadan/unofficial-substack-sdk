@@ -1,3 +1,4 @@
+import { SubstackApiError } from '../../core/errors.js'
 import type { EndpointContext } from '../../core/transport.js'
 import { boundedString, positiveInteger } from '../../core/validation.js'
 import type {
@@ -14,6 +15,7 @@ import type {
   NoteRepliesResponse,
   NoteResponse,
   NoteRestackOptions,
+  NotesOptions,
   NoteWithEngagement,
   ProfileNotesPage,
   PublishNoteRequest,
@@ -21,6 +23,7 @@ import type {
   UploadedImage,
   UpdateScheduledNoteRequest
 } from '../../core/types.js'
+import { getAuthenticatedProfile } from '../profiles/index.js'
 
 const DEFAULT_TAB_ID = 'for-you'
 
@@ -45,8 +48,21 @@ function noteBodyJson(body: string): Record<string, unknown> {
   }
 }
 
-export function getNotes(context: EndpointContext, options: CursorOptions = {}): Promise<unknown> {
-  return context.publication(`/notes${cursorQuery(options)}`)
+export async function getNotes<
+  T extends Record<string, unknown> = NoteFeedItem
+>(
+  context: EndpointContext,
+  options: NotesOptions = {}
+): Promise<ProfileNotesPage<T>> {
+  let profileId = options.profileId
+  if (!profileId) {
+    const profile = (await getAuthenticatedProfile(context)) as { id?: number | string }
+    if (!profile?.id) {
+      throw new SubstackApiError('Authenticated Substack profile ID was not found.', 502, '/handle/options')
+    }
+    profileId = profile.id
+  }
+  return getProfileNotes<T>(context, profileId, options)
 }
 
 /** Returns scheduled Note drafts for the authenticated account. */

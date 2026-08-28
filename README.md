@@ -67,7 +67,7 @@ Keep the session token local and out of source control. All MCP tools are read-o
 | `get_publication_analytics` | Full-history totals, average upstream rates, audience/section/type breakdowns, top posts, and optional raw rows. |
 | `get_post_engagement` | Post content engagement and a bounded visible-comment sample. |
 | `get_post_analytics` | Combined author analytics, delivery, conversion, media, links, referrers, comparison data, and visible engagement. |
-| `get_notes` | Bounded authenticated-publication Notes page. |
+| `get_notes` | Bounded Notes page from authenticated profile or optional `profile_id`. |
 | `get_profile_notes` | Bounded profile Notes page with raw per-Note metrics. |
 | `get_note_engagement` | Reactions, restacks, viewer state, and fully paginated direct/nested reply totals. |
 | `get_subscriber_summary` | Privacy-safe subscriber totals. Raw records require explicit `include_records: true`. |
@@ -93,7 +93,7 @@ Keep the session token local and out of source control. All MCP tools are read-o
 | `getEmailStats({ offset, orderBy, orderDirection })` | Publication email delivery and engagement stats. Uses Substack's required fixed page size of 20. Requires a publication administrator session. |
 | `getAllEmailStats({ offset, orderBy, orderDirection })` | Fetches every 20-row email-stat page and returns one flat array of rows. |
 | `getSubscriberStats()` | Publication subscriber records and aggregate count. The response may contain subscriber personal data. |
-| `getNotes({ cursor })` | Authenticated publication Notes feed. |
+| `getNotes({ cursor, profileId })` | Authenticated profile Notes feed (resolves profile ID automatically if omitted). |
 | `getDraftNotes({ limit })` | Scheduled Note drafts for the authenticated account. Defaults to 20. |
 | `getNote(id)` | Raw, typed Note by ID. |
 | `getNoteWithEngagement(id)` | Raw Note and reply pages plus normalized, fully paginated visible reply totals. |

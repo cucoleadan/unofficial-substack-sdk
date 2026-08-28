@@ -36,6 +36,10 @@ export interface CursorOptions {
   cursor?: string
 }
 
+export interface NotesOptions extends CursorOptions {
+  profileId?: number | string
+}
+
 export interface NoteActionOptions {
   /** Feed tab context sent to Substack. Defaults to `for-you`. */
   tabId?: string

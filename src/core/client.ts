@@ -22,6 +22,7 @@ import type {
   NoteRepliesResponse,
   NoteResponse,
   NoteRestackOptions,
+  NotesOptions,
   NoteWithEngagement,
   PostManagementDetail,
   PostManagementPost,
@@ -193,8 +194,10 @@ export class SubstackClient {
     return getProfilePosts(this.endpoints, id, options)
   }
 
-  getNotes(options: CursorOptions = {}): Promise<unknown> {
-    return getNotes(this.endpoints, options)
+  getNotes<T extends Record<string, unknown> = NoteFeedItem>(
+    options: NotesOptions = {}
+  ): Promise<ProfileNotesPage<T>> {
+    return getNotes<T>(this.endpoints, options)
   }
 
   /** Returns scheduled Note drafts for the authenticated account. */
