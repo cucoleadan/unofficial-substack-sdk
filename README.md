@@ -45,7 +45,7 @@ Copy [`.dev.vars.example`](.dev.vars.example) to `.dev.vars` and replace the pla
 
 ## MCP server
 
-The package includes a read-only STDIO MCP server for publication, post, Note, subscriber, and activity analytics. It exposes both bounded raw endpoint data and compact full-history summaries. Set `SUBSTACK_SESSION_TOKEN` and `SUBSTACK_PUBLICATION_URL`, then configure Codex:
+The package includes a read-only STDIO MCP server for publication, post, Note, subscriber, and activity analytics. It returns compact, normalized model-facing data by default, with explicit raw-data opt-ins where supported. Set `SUBSTACK_SESSION_TOKEN` and `SUBSTACK_PUBLICATION_URL`, then configure Codex:
 
 ```toml
 [mcp_servers.substack]
@@ -67,15 +67,15 @@ Keep the session token local and out of source control. All MCP tools are read-o
 | `get_publication_analytics` | Full-history totals, average upstream rates, audience/section/type breakdowns, top posts, and optional raw rows. |
 | `get_post_engagement` | Post content engagement and a bounded visible-comment sample. |
 | `get_post_analytics` | Combined author analytics, delivery, conversion, media, links, referrers, comparison data, and visible engagement. |
-| `get_notes` | Bounded Notes page from authenticated profile or optional `profile_id`. |
-| `get_profile_notes` | Bounded profile Notes page with raw per-Note metrics. |
+| `get_notes` | Compact, body-first Notes from the authenticated profile or optional `profile_id`; supports guarded `fetch_all`. |
+| `get_profile_notes` | Compact, body-first profile Notes with cursor paging or guarded `fetch_all`. |
 | `get_note_engagement` | Reactions, restacks, viewer state, and fully paginated direct/nested reply totals. |
 | `get_subscriber_summary` | Privacy-safe subscriber totals. Raw records require explicit `include_records: true`. |
 | `get_activity` | Bounded activity filtered by all events, replies and mentions, or restacks. |
 | `get_unread_activity` | Bounded unread activity plus unread metadata. |
 | `analyze_content` | Compact complete analytics for one post without comment or raw-response payloads. |
 
-`get_publication_analytics` follows every email-stat page before calculating its summary, so it can make several authenticated requests for a large archive. Raw rows are excluded by default and capped when requested. `get_subscriber_summary` excludes subscriber records by default because they can contain email addresses and other personal data. See [MCP analytics](docs/mcp-analytics.md) for output semantics and usage examples.
+`get_publication_analytics` follows every email-stat page before calculating its summary, so it can make several authenticated requests for a large archive. Raw rows are excluded by default and capped when requested. `get_notes` and `get_profile_notes` default to 10 complete Note bodies; set `fetch_all: true` to follow every cursor up to `max_items` (default 500, maximum 5,000). `get_subscriber_summary` excludes subscriber records by default because they can contain email addresses and other personal data. See [MCP analytics](docs/mcp-analytics.md) for output semantics and usage examples.
 
 ## API
 

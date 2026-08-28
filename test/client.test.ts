@@ -316,10 +316,10 @@ describe('SubstackClient', () => {
       }
     })
 
-    await client.getNotes({ profileId: 42, cursor: 'next page' })
+    await client.getNotes({ profileId: 42, cursor: 'next page', limit: 10 })
 
     expect(request?.url).toBe(
-      'https://allagentsconsidered.substack.com/api/v1/reader/feed/profile/42?types=note&cursor=next+page'
+      'https://allagentsconsidered.substack.com/api/v1/reader/feed/profile/42?types=note&limit=10&cursor=next+page'
     )
   })
 

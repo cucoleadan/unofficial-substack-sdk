@@ -55,8 +55,18 @@ const mockClient = (overrides: Record<string, unknown> = {}) => ({
     commentItems: [{ id: 10 }, { id: 11 }],
     engagement: { visibleCommentCount: 2 }
   }),
-  getNotes: async () => ({ items: [{ id: 1 }, { id: 2 }] }),
-  getProfileNotes: async () => ({ items: [{ id: 3 }, { id: 4 }] }),
+  getNotes: async () => ({
+    items: [
+      { comment: { id: 1, body: 'First Note', date: '2026-08-01T10:00:00Z' } },
+      { comment: { id: 2, body: 'Second Note', date: '2026-08-02T10:00:00Z' } }
+    ]
+  }),
+  getProfileNotes: async () => ({
+    items: [
+      { comment: { id: 3, body: 'Third Note', date: '2026-08-03T10:00:00Z' } },
+      { comment: { id: 4, body: 'Fourth Note', date: '2026-08-04T10:00:00Z' } }
+    ]
+  }),
   getNoteWithEngagement: async () => ({
     note: { item: { comment: { id: 5, reaction_count: 9, restacks: 2 } } },
     replyPages: [{ commentBranches: [] }, { commentBranches: [] }],
@@ -106,10 +116,182 @@ describe('MCP tools', () => {
       data: { rows: [{ post_id: 1 }] }
     })
     expect((await tools.getNotes(undefined, 1)).structuredContent).toEqual({
-      data: { items: [{ id: 1 }] }
+      data: {
+        items: [{ id: 1, body: 'First Note', created_at: '2026-08-01T10:00:00Z' }],
+        returned: 1,
+        pages_fetched: 1,
+        complete: true,
+        has_more: false,
+        cursor: null
+      }
     })
     expect((await tools.getProfileNotes(7, undefined, 1)).structuredContent).toEqual({
-      data: { items: [{ id: 3 }] }
+      data: {
+        items: [{ id: 3, body: 'Third Note', created_at: '2026-08-03T10:00:00Z' }],
+        returned: 1,
+        pages_fetched: 1,
+        complete: true,
+        has_more: false,
+        cursor: null
+      }
+    })
+  })
+
+  test('fetches every profile Note page, normalizes bodies, and deduplicates IDs', async () => {
+    const cursors: Array<string | undefined> = []
+    const tools = createToolHandlers(
+      mockClient({
+        getProfileNotes: async (_profileId: number, options: { cursor?: string }) => {
+          cursors.push(options.cursor)
+          return options.cursor
+            ? {
+                items: [
+                  { comment: { id: 2, body: 'Duplicate' } },
+                  { comment: { id: 3, body: 'Final body' } }
+                ],
+                nextCursor: null
+              }
+            : {
+                items: [
+                  { comment: { id: 1, body: 'First body' } },
+                  { comment: { id: 2, body: 'Second body' } }
+                ],
+                nextCursor: 'page-2'
+              }
+        }
+      }) as never
+    )
+
+    const result = await tools.getProfileNotes(7, undefined, 10, true, 500)
+
+    expect(cursors).toEqual([undefined, 'page-2'])
+    expect(result.structuredContent).toEqual({
+      data: {
+        items: [
+          { id: 1, body: 'First body' },
+          { id: 2, body: 'Second body' },
+          { id: 3, body: 'Final body' }
+        ],
+        returned: 3,
+        pages_fetched: 2,
+        complete: true,
+        has_more: false,
+        cursor: null
+      }
+    })
+    expect(result.content[0].text).toBe('Returned 3 items.')
+  })
+
+  test('stops fetch-all collection at max_items with a resumable cursor', async () => {
+    const tools = createToolHandlers(
+      mockClient({
+        getProfileNotes: async (
+          _profileId: number,
+          options: { cursor?: string; limit?: number }
+        ) => {
+          const start = options.cursor === 'page-2' ? 41 : 1
+          const count = options.cursor === 'page-2' ? options.limit ?? 10 : 40
+          return {
+            items: Array.from({ length: count }, (_, index) => ({
+              comment: { id: start + index, body: `Note ${start + index}` }
+            })),
+            nextCursor: options.cursor === 'page-2' ? 'page-3' : 'page-2'
+          }
+        }
+      }) as never
+    )
+
+    const result = await tools.getProfileNotes(7, undefined, 10, true, 50)
+
+    expect(result.structuredContent).toMatchObject({
+      data: {
+        returned: 50,
+        pages_fetched: 2,
+        complete: false,
+        has_more: true,
+        cursor: 'page-3'
+      }
+    })
+  })
+
+  test('prunes raw Note and activity metadata from AI-facing responses', async () => {
+    const tools = createToolHandlers(
+      mockClient({
+        getProfileNotes: async () => ({
+          items: [
+            {
+              entity_key: 'c-9',
+              context: { timestamp: '2026-08-28T10:00:00Z', page_rank: 1 },
+              comment: {
+                id: 9,
+                body: 'Important body',
+                tracking_parameters: { large: 'discard me' },
+                attachments: [{ type: 'image', url: 'https://example.com/image.png' }]
+              },
+              trackingParameters: { large: 'discard me too' }
+            },
+            {
+              comment: {
+                id: 10,
+                body: '',
+                attachments: [
+                  {
+                    id: 'image-1',
+                    type: 'image',
+                    url: 'https://example.com/image.png',
+                    publication: { theme: { large: 'discard me' } }
+                  }
+                ]
+              }
+            }
+          ],
+          publications: [{ theme: { large: true } }]
+        }),
+        getActivity: async () => ({
+          activityItems: [
+            {
+              id: 'activity-1',
+              type: 'mention',
+              created_at: '2026-08-28T10:00:00Z',
+              trackingParams: { large: 'discard me' }
+            }
+          ],
+          users: [{ bio: 'discard me' }],
+          posts: [{ body_html: 'discard me' }],
+          more: true
+        })
+      }) as never
+    )
+
+    const notes = await tools.getProfileNotes(7, undefined, 10)
+    const activity = await tools.getActivity('all', 10)
+
+    expect(notes.structuredContent).toEqual({
+      data: {
+        items: [
+          { id: 9, body: 'Important body', created_at: '2026-08-28T10:00:00Z' },
+          {
+            id: 10,
+            body: '',
+            attachments: [
+              { id: 'image-1', type: 'image', url: 'https://example.com/image.png' }
+            ]
+          }
+        ],
+        returned: 2,
+        pages_fetched: 1,
+        complete: true,
+        has_more: false,
+        cursor: null
+      }
+    })
+    expect(activity.structuredContent).toEqual({
+      data: {
+        activityItems: [
+          { id: 'activity-1', type: 'mention', created_at: '2026-08-28T10:00:00Z' }
+        ],
+        more: true
+      }
     })
   })
 
@@ -141,23 +323,21 @@ describe('MCP tools', () => {
           subscribes: 3,
           podcast_preview_downloads: 25
         },
-        averageRates: { engagement_rate: 0.4 },
+        summary: { engagement_rate: 0.4 },
         breakdowns: {
           byAudience: { paid: 1 },
           bySection: {},
           byType: { podcast: 1 }
         },
-        topPosts: {
-          metric: 'clicks',
-          posts: [
-            {
-              post_id: 2,
-              title: 'Second',
-              post_date: '2026-02-01T10:00:00Z',
-              clicks: 12
-            }
-          ]
-        },
+        top_metric: 'clicks',
+        top_posts: [
+          {
+            post_id: 2,
+            title: 'Second',
+            post_date: '2026-02-01T10:00:00Z',
+            clicks: 12
+          }
+        ],
         availableFields: [
           'audience',
           'clicks',
@@ -192,17 +372,19 @@ describe('MCP tools', () => {
     expect(result.structuredContent).toEqual({
       data: {
         post: { id: 1, title: 'Post', subtitle: 'Subtitle' },
-        analytics: { delivered: 100, opens: 50, links: [['https://example.com', 4]] },
-        contentEngagement: { visibleCommentCount: 2 },
-        managementEngagement: {
-          reactionCount: 8,
-          reactions: undefined,
-          commentCount: 3,
-          replyCount: 2
+        stats: { delivered: 100, opens: 50, links: [['https://example.com', 4]] },
+        engagement: {
+          content: { visibleCommentCount: 2 },
+          management: {
+            reaction_count: 8,
+            reactions: undefined,
+            comment_count: 3,
+            reply_count: 2
+          }
         },
         comments: [{ id: 10 }],
-        commentsReturned: 1,
-        visibleCommentCount: 2
+        comments_returned: 1,
+        visible_comment_count: 2
       }
     })
   })
@@ -212,11 +394,13 @@ describe('MCP tools', () => {
     const data = result.structuredContent?.data as Record<string, unknown>
 
     expect(data).toMatchObject({
-      post: { id: 1, title: 'Post', subtitle: 'Subtitle' },
-      analytics: { delivered: 100, opens: 50 },
-      contentEngagement: { visibleCommentCount: 2 },
-      comments: [],
-      commentsReturned: 0
+      post_id: 1,
+      title: 'Post',
+      performance: { delivered: 100, opens: 50 },
+      engagement: {
+        content: { visibleCommentCount: 2 },
+        management: { reaction_count: 8, comment_count: 3, reply_count: 2 }
+      }
     })
     expect(data).not.toHaveProperty('raw')
   })
@@ -226,7 +410,7 @@ describe('MCP tools', () => {
 
     expect(result.structuredContent).toEqual({
       data: {
-        note: { comment: { id: 5, reaction_count: 9, restacks: 2 } },
+        item: { id: 5, body: '' },
         engagement: {
           reactionCount: 9,
           restackCount: 2,
@@ -235,9 +419,9 @@ describe('MCP tools', () => {
           totalReplyCount: 3,
           replyCountsComplete: true
         },
-        replyPagesFetched: 2,
-        replies: [{ comment: { id: 6 } }],
-        repliesReturned: 1
+        reply_pages_fetched: 2,
+        replies: [{ id: 6 }],
+        replies_returned: 1
       }
     })
   })
@@ -251,16 +435,16 @@ describe('MCP tools', () => {
     >
 
     expect(safe).toEqual({
-      subscriberCount: 2,
-      recordsReturnedByUpstream: 2,
-      upstreamAggregates: { total: 2, has_more: false },
-      availableRecordFields: ['user_email_address', 'user_id'],
-      personalDataIncluded: false
+      count: 2,
+      records_returned_by_upstream: 2,
+      aggregates: { total: 2, has_more: false },
+      available_record_fields: ['user_email_address', 'user_id'],
+      personal_data_included: false
     })
     expect(safe).not.toHaveProperty('subscribers')
     expect(optedIn).toMatchObject({
-      subscriberCount: 2,
-      personalDataIncluded: true,
+      count: 2,
+      personal_data_included: true,
       subscribers: [{ user_id: 1, user_email_address: 'one@example.com' }]
     })
   })
@@ -270,9 +454,9 @@ describe('MCP tools', () => {
     const result = await tools.getSubscriberStats()
 
     expect(result.isError).toBeUndefined()
-    expect(result.structuredContent).toMatchObject({ total: 2 })
+    expect(result.structuredContent).toEqual({ data: { total_subscribers: 2 } })
     expect(result.content[0].type).toBe('text')
-    expect(JSON.parse(result.content[0].text)).toMatchObject({ total: 2 })
+    expect(result.content[0].text).toBe('Request completed successfully.')
   })
 
   test('handles errors cleanly in getSubscriberStats tool', async () => {
@@ -286,7 +470,7 @@ describe('MCP tools', () => {
     const result = await tools.getSubscriberStats()
 
     expect(result.isError).toBe(true)
-    expect(result.content[0].text).toBe('Failed to fetch subscriber stats: Network timeout')
+    expect(result.content[0].text).toBe('Network timeout')
   })
 
   test('returns growth sources structured content from tool handler with snake_case and camelCase args', async () => {

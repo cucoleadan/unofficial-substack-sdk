@@ -45,6 +45,9 @@ type PublicationAnalyticsOptions = EmailStatsOptions & {
 
 const id = z.union([z.number().int().positive(), z.string().min(1)])
 const limit = z.number().int().min(1).max(50).default(20)
+const noteLimit = z.number().int().min(1).max(50).default(10)
+const fetchAll = z.boolean().default(false)
+const maxNoteItems = z.number().int().min(1).max(5_000).default(500)
 const emailRowLimit = z.number().int().min(1).max(20).default(20)
 const rawRowLimit = z.number().int().min(1).max(200).default(20)
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD.')
@@ -134,7 +137,8 @@ const authenticatedProfileOutputSchema = {
 const recentPostsOutputSchema = {
   data: z
     .object({
-      posts: z.array(z.record(z.string(), z.unknown())).describe('Recent published posts')
+      posts: z.array(z.record(z.string(), z.unknown())).describe('Recent published posts'),
+      cursor: z.string().optional().describe('Pagination cursor for the next page')
     })
     .passthrough()
 }
@@ -181,22 +185,39 @@ const postAnalyticsOutputSchema = {
     .passthrough()
 }
 
+const compactNoteSchema = z.object({
+  id: z.union([z.number(), z.string()]).optional().describe('Note ID'),
+  body: z.string().describe('Complete Note body'),
+  created_at: z.string().optional().describe('Note publication timestamp'),
+  url: z.string().optional().describe('Note permalink when supplied upstream'),
+  attachments: z
+    .array(z.record(z.string(), z.unknown()))
+    .optional()
+    .describe('Minimal attachment details for Notes without a text body')
+})
+
 const notesOutputSchema = {
   data: z
     .object({
-      items: z.array(z.record(z.string(), z.unknown())).describe('Notes items'),
-      cursor: z.string().optional().describe('Pagination cursor for next page')
+      items: z.array(compactNoteSchema).describe('Body-first Note records'),
+      returned: z.number().int().nonnegative().describe('Number of Notes returned'),
+      pages_fetched: z.number().int().positive().describe('Number of upstream pages fetched'),
+      complete: z.boolean().describe('Whether the requested collection was fully fetched'),
+      has_more: z.boolean().describe('Whether another page is available'),
+      cursor: z.string().nullable().describe('Pagination cursor for the next page')
     })
-    .passthrough()
 }
 
 const profileNotesOutputSchema = {
   data: z
     .object({
-      items: z.array(z.record(z.string(), z.unknown())).describe('Notes published by profile'),
-      cursor: z.string().optional().describe('Pagination cursor for next page')
+      items: z.array(compactNoteSchema).describe('Body-first Notes published by the profile'),
+      returned: z.number().int().nonnegative().describe('Number of Notes returned'),
+      pages_fetched: z.number().int().positive().describe('Number of upstream pages fetched'),
+      complete: z.boolean().describe('Whether the requested collection was fully fetched'),
+      has_more: z.boolean().describe('Whether another page is available'),
+      cursor: z.string().nullable().describe('Pagination cursor for the next page')
     })
-    .passthrough()
 }
 
 const noteEngagementOutputSchema = {
@@ -235,7 +256,8 @@ const subscriberStatsOutputSchema = {
 const activityOutputSchema = {
   data: z
     .object({
-      activityItems: z.array(z.record(z.string(), z.unknown())).describe('Activity notification items')
+      activityItems: z.array(z.record(z.string(), z.unknown())).describe('Activity notification items'),
+      more: z.boolean().optional().describe('Whether more activity is available upstream')
     })
     .passthrough()
 }
@@ -332,8 +354,17 @@ const growthSourcesGranularity = z
 
 function result(data: unknown): ToolResult {
   const output = { data }
+  const record = isRecord(data) ? data : undefined
+  const collectionKey = record
+    ? ['items', 'posts', 'rows', 'activityItems', 'comments', 'replies', 'top_posts', 'subscribers'].find(
+        (key) => Array.isArray(record[key])
+      )
+    : undefined
+  const summary = collectionKey
+    ? `Returned ${(record?.[collectionKey] as unknown[]).length} ${collectionKey}.`
+    : 'Request completed successfully.'
   return {
-    content: [{ type: 'text', text: JSON.stringify(output, null, 2) }],
+    content: [{ type: 'text', text: summary }],
     structuredContent: output
   }
 }
@@ -375,12 +406,236 @@ function compactPost(post: Record<string, unknown>): Record<string, unknown> {
     'title',
     'subtitle',
     'slug',
+    'canonical_url',
     'post_date',
     'audience',
     'type',
     'wordcount'
   ]
   return Object.fromEntries(keys.filter((key) => post[key] !== undefined).map((key) => [key, post[key]]))
+}
+
+function selectDefined(
+  record: Record<string, unknown>,
+  keys: readonly string[]
+): Record<string, unknown> {
+  return Object.fromEntries(
+    keys
+      .filter((key) => record[key] !== undefined && record[key] !== null)
+      .map((key) => [key, record[key]])
+  )
+}
+
+function compactProfile(profile: unknown): Record<string, unknown> {
+  return isRecord(profile)
+    ? selectDefined(profile, ['id', 'handle', 'name', 'photo_url', 'bio'])
+    : {}
+}
+
+function bodyJsonText(value: unknown): string {
+  if (Array.isArray(value)) return value.map(bodyJsonText).filter(Boolean).join('\n')
+  if (!isRecord(value)) return ''
+  if (typeof value.text === 'string') return value.text
+  return bodyJsonText(value.content)
+}
+
+function compactAttachment(value: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(value)) return undefined
+  const post = isRecord(value.post) ? value.post : undefined
+  const comment = isRecord(value.comment) ? value.comment : undefined
+  const compact = selectDefined(value, ['id', 'type', 'url', 'title'])
+  const body = typeof comment?.body === 'string' ? comment.body : undefined
+  const title = typeof post?.title === 'string' ? post.title : undefined
+  const url =
+    typeof post?.canonical_url === 'string'
+      ? post.canonical_url
+      : typeof comment?.canonical_url === 'string'
+        ? comment.canonical_url
+        : undefined
+  return {
+    ...compact,
+    ...(title ? { title } : {}),
+    ...(body ? { body } : {}),
+    ...(url ? { url } : {})
+  }
+}
+
+function compactNote(value: unknown): Record<string, unknown> {
+  const item = isRecord(value) ? value : {}
+  const comment = isRecord(item.comment) ? item.comment : item
+  const context = isRecord(item.context) ? item.context : undefined
+  const entityKey = typeof item.entity_key === 'string' ? item.entity_key : undefined
+  const parsedEntityId = entityKey?.startsWith('c-') ? finiteNumber(entityKey.slice(2)) : undefined
+  const body =
+    typeof comment.body === 'string'
+      ? comment.body
+      : bodyJsonText(comment.body_json)
+  const createdAt =
+    typeof comment.date === 'string'
+      ? comment.date
+      : typeof comment.created_at === 'string'
+        ? comment.created_at
+        : typeof context?.timestamp === 'string'
+          ? context.timestamp
+          : undefined
+  const urlCandidate = [comment.url, comment.canonical_url, item.url, item.canonical_url].find(
+    (candidate): candidate is string => typeof candidate === 'string' && candidate.length > 0
+  )
+  const attachments = Array.isArray(comment.attachments)
+    ? comment.attachments.map(compactAttachment).filter(isRecord)
+    : []
+
+  return {
+    ...(comment.id !== undefined
+      ? { id: comment.id }
+      : item.id !== undefined
+        ? { id: item.id }
+        : parsedEntityId !== undefined
+          ? { id: parsedEntityId }
+          : {}),
+    body,
+    ...(createdAt ? { created_at: createdAt } : {}),
+    ...(urlCandidate ? { url: urlCandidate } : {}),
+    ...(!body.trim() && attachments.length > 0 ? { attachments } : {})
+  }
+}
+
+function compactComment(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) return {}
+  const compact = selectDefined(value, [
+    'id',
+    'body',
+    'date',
+    'created_at',
+    'name',
+    'handle',
+    'user_id',
+    'parent_id',
+    'reaction_count',
+    'restacks',
+    'children_count'
+  ])
+  if (Array.isArray(value.children)) {
+    compact.children = value.children.map(compactComment)
+  }
+  return compact
+}
+
+function compactReply(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) return {}
+  const reply = isRecord(value.comment) ? compactComment(value.comment) : compactComment(value)
+  if (Array.isArray(value.descendantComments)) {
+    reply.descendant_replies = value.descendantComments.map((descendant) =>
+      isRecord(descendant) && isRecord(descendant.comment)
+        ? compactComment(descendant.comment)
+        : compactComment(descendant)
+    )
+  }
+  return reply
+}
+
+function compactActivityItem(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) return {}
+  return selectDefined(value, [
+    'id',
+    'user_id',
+    'item_key',
+    'type',
+    'created_at',
+    'updated_at',
+    'sender_count',
+    'recent_sender_ids',
+    'publication_id',
+    'comment_id',
+    'mention_id',
+    'target_user_id',
+    'target_post_id',
+    'target_comment_id',
+    'target_community_post_id',
+    'target_community_comment_id',
+    'target_live_stream_id',
+    'target_media_clip_id',
+    'source',
+    'source_name',
+    'isNew',
+    'cta',
+    'secondaryCta'
+  ])
+}
+
+type CompactNotesOptions = {
+  cursor?: string
+  limit: number
+  fetchAll: boolean
+  maxItems: number
+}
+
+async function collectCompactNotes(
+  fetchPage: (cursor: string | undefined, limit: number) => Promise<unknown>,
+  options: CompactNotesOptions
+): Promise<Record<string, unknown>> {
+  const items: Record<string, unknown>[] = []
+  const seenIds = new Set<string>()
+  const seenCursors = new Set<string>()
+  let cursor = options.cursor
+  let pagesFetched = 0
+  let complete = false
+
+  while (true) {
+    const pageCursor = cursor
+    const pageLimit = options.fetchAll
+      ? Math.max(1, Math.min(50, options.maxItems - items.length))
+      : options.limit
+    const response = await fetchPage(pageCursor, pageLimit)
+    pagesFetched += 1
+    const page = isRecord(response) ? response : {}
+    const pageItems = Array.isArray(page.items) ? page.items.map(compactNote) : []
+    const uniquePageItems = pageItems.filter((item) => {
+      if (item.id === undefined) return true
+      const key = String(item.id)
+      if (seenIds.has(key)) return false
+      seenIds.add(key)
+      return true
+    })
+    const nextCursor =
+      typeof page.nextCursor === 'string' && page.nextCursor.length > 0
+        ? page.nextCursor
+        : undefined
+
+    if (options.fetchAll && items.length > 0 && items.length + uniquePageItems.length > options.maxItems) {
+      cursor = pageCursor
+      break
+    }
+
+    const remaining = options.fetchAll ? options.maxItems - items.length : options.limit
+    items.push(...uniquePageItems.slice(0, remaining))
+    if (!options.fetchAll) {
+      cursor = nextCursor
+      complete = !nextCursor
+      break
+    }
+    if (!nextCursor) {
+      cursor = undefined
+      complete = true
+      break
+    }
+    if (seenCursors.has(nextCursor)) {
+      cursor = nextCursor
+      break
+    }
+    seenCursors.add(nextCursor)
+    cursor = nextCursor
+    if (items.length >= options.maxItems) break
+  }
+
+  return {
+    items,
+    returned: items.length,
+    pages_fetched: pagesFetched,
+    complete,
+    has_more: !complete,
+    cursor: cursor ?? null
+  }
 }
 
 function filterRowsByDate(
@@ -443,13 +698,14 @@ function summarizeEmailStats(
     rowsAnalyzed: rows.length,
     dateRange: dates.length > 0 ? { from: dates[0], to: dates.at(-1) } : undefined,
     totals,
-    averageRates: averages,
+    summary: averages,
     breakdowns: {
       byAudience: dimensionCounts(rows, 'audience'),
       bySection: dimensionCounts(rows, 'section_name'),
       byType: dimensionCounts(rows, 'type')
     },
-    topPosts: { metric: topMetric, posts: topPosts },
+    top_metric: topMetric,
+    top_posts: topPosts,
     availableFields: [...new Set(rows.flatMap((row) => Object.keys(row)))].sort(),
     ...(options.includeRows ? { rows: rows.slice(0, options.rowLimit ?? 20) } : {})
   }
@@ -471,6 +727,17 @@ function subscriberCount(response: Record<string, unknown>, records: unknown[]):
   return records.length
 }
 
+function optionalSubscriberCount(
+  response: Record<string, unknown>,
+  records: unknown[]
+): number | undefined {
+  for (const key of ['total', 'count', 'subscriber_count', 'subscriberCount']) {
+    const value = finiteNumber(response[key])
+    if (value !== undefined && value >= 0) return Math.floor(value)
+  }
+  return Array.isArray(response.subscribers) ? records.length : undefined
+}
+
 export function createToolHandlers(client: ReadOnlyClient) {
   const run = async (work: () => Promise<unknown>) => {
     try {
@@ -480,43 +747,60 @@ export function createToolHandlers(client: ReadOnlyClient) {
     }
   }
 
+  const loadPostAnalytics = async (
+    postId: string | number,
+    commentLimit = 20,
+    includeRaw = false
+  ) => {
+    const [postResult, managementDetail] = await Promise.all([
+      client.getPostWithEngagement(postId),
+      client.getPostManagementDetail(postId)
+    ])
+    const managementPost = Array.isArray(managementDetail.posts)
+      ? managementDetail.posts.find((post) => String(post.id) === String(postId)) ?? managementDetail.posts[0]
+      : undefined
+    const managementEngagement = managementPost
+      ? {
+          reaction_count: managementPost.reaction_count,
+          reactions: managementPost.reactions,
+          comment_count: managementPost.comment_count,
+          reply_count: managementPost.child_comment_count
+        }
+      : undefined
+
+    return {
+      post: compactPost(postResult.post),
+      stats: managementPost?.stats,
+      engagement: {
+        content: postResult.engagement,
+        management: managementEngagement
+      },
+      comments: postResult.commentItems.slice(0, commentLimit).map(compactComment),
+      comments_returned: Math.min(commentLimit, postResult.commentItems.length),
+      visible_comment_count: postResult.commentItems.length,
+      ...(includeRaw ? { raw: { post: postResult.post, managementDetail } } : {})
+    }
+  }
+
   const getPostAnalytics = (
     postId: string | number,
     commentLimit = 20,
     includeRaw = false
-  ) =>
-    run(async () => {
-      const [postResult, managementDetail] = await Promise.all([
-        client.getPostWithEngagement(postId),
-        client.getPostManagementDetail(postId)
-      ])
-      const managementPost = Array.isArray(managementDetail.posts)
-        ? managementDetail.posts.find((post) => String(post.id) === String(postId)) ?? managementDetail.posts[0]
-        : undefined
-
-      return {
-        post: compactPost(postResult.post),
-        analytics: managementPost?.stats,
-        contentEngagement: postResult.engagement,
-        managementEngagement: managementPost
-          ? {
-              reactionCount: managementPost.reaction_count,
-              reactions: managementPost.reactions,
-              commentCount: managementPost.comment_count,
-              replyCount: managementPost.child_comment_count
-            }
-          : undefined,
-        comments: postResult.commentItems.slice(0, commentLimit),
-        commentsReturned: Math.min(commentLimit, postResult.commentItems.length),
-        visibleCommentCount: postResult.commentItems.length,
-        ...(includeRaw ? { raw: { post: postResult.post, managementDetail } } : {})
-      }
-    })
+  ) => run(() => loadPostAnalytics(postId, commentLimit, includeRaw))
 
   return {
-    getAuthenticatedProfile: () => run(() => client.getAuthenticatedProfile()),
+    getAuthenticatedProfile: () => run(async () => compactProfile(await client.getAuthenticatedProfile())),
     getRecentPosts: (profileId: string | number, maximum = 20) =>
-      run(async () => capped(await client.getProfilePosts(profileId, { limit: maximum }), maximum)),
+      run(async () => {
+        const response = await client.getProfilePosts(profileId, { limit: maximum })
+        const record = isRecord(response) ? response : {}
+        return {
+          posts: Array.isArray(record.posts)
+            ? record.posts.slice(0, maximum).map((post) => compactPost(isRecord(post) ? post : {}))
+            : [],
+          ...(typeof record.nextCursor === 'string' ? { cursor: record.nextCursor } : {})
+        }
+      }),
     getEmailStats: (options: EmailStatsOptions, maximum = 20) =>
       run(async () => capped(await client.getEmailStats(options), maximum)),
     getPublicationAnalytics: (options: PublicationAnalyticsOptions = {}) =>
@@ -542,13 +826,41 @@ export function createToolHandlers(client: ReadOnlyClient) {
     getPostEngagement: (postId: string | number, maximum = 20) =>
       run(async () => {
         const { post, engagement, commentItems } = await client.getPostWithEngagement(postId)
-        return { post, engagement, comments: commentItems.slice(0, maximum) }
+        return {
+          post: compactPost(post),
+          engagement,
+          comments: commentItems.slice(0, maximum).map(compactComment)
+        }
       }),
     getPostAnalytics,
-    getNotes: (cursor: string | undefined, maximum = 20, profileId?: string | number) =>
-      run(async () => capped(await client.getNotes({ cursor, profileId }), maximum)),
-    getProfileNotes: (profileId: string | number, cursor: string | undefined, maximum = 20) =>
-      run(async () => capped(await client.getProfileNotes(profileId, { cursor }), maximum)),
+    getNotes: (
+      cursor: string | undefined,
+      maximum = 10,
+      profileId?: string | number,
+      fetchEveryPage = false,
+      maximumItems = 500
+    ) =>
+      run(() =>
+        collectCompactNotes(
+          (pageCursor, pageLimit) =>
+            client.getNotes({ cursor: pageCursor, profileId, limit: pageLimit }),
+          { cursor, limit: maximum, fetchAll: fetchEveryPage, maxItems: maximumItems }
+        )
+      ),
+    getProfileNotes: (
+      profileId: string | number,
+      cursor: string | undefined,
+      maximum = 10,
+      fetchEveryPage = false,
+      maximumItems = 500
+    ) =>
+      run(() =>
+        collectCompactNotes(
+          (pageCursor, pageLimit) =>
+            client.getProfileNotes(profileId, { cursor: pageCursor, limit: pageLimit }),
+          { cursor, limit: maximum, fetchAll: fetchEveryPage, maxItems: maximumItems }
+        )
+      ),
     getNoteEngagement: (
       noteId: string | number,
       maximum = 20,
@@ -557,12 +869,12 @@ export function createToolHandlers(client: ReadOnlyClient) {
       run(async () => {
         const noteResult = await client.getNoteWithEngagement(noteId)
         return {
-          note: noteResult.note.item,
+          item: compactNote(noteResult.note.item),
           engagement: noteResult.engagement,
-          replyPagesFetched: noteResult.replyPages.length,
-          replies: noteResult.replies.slice(0, maximum),
-          repliesReturned: Math.min(maximum, noteResult.replies.length),
-          ...(includeRawPages ? { rawReplyPages: noteResult.replyPages } : {})
+          reply_pages_fetched: noteResult.replyPages.length,
+          replies: noteResult.replies.slice(0, maximum).map(compactReply),
+          replies_returned: Math.min(maximum, noteResult.replies.length),
+          ...(includeRawPages ? { raw_reply_pages: noteResult.replyPages } : {})
         }
       }),
     getSubscriberSummary: (includeRecords = false, maximum = 20) =>
@@ -571,37 +883,65 @@ export function createToolHandlers(client: ReadOnlyClient) {
         const record = isRecord(response) ? response : {}
         const subscribers = Array.isArray(response.subscribers) ? response.subscribers : []
         return {
-          subscriberCount: subscriberCount(record, subscribers),
-          recordsReturnedByUpstream: subscribers.length,
-          upstreamAggregates: safeSubscriberMetadata(record),
-          availableRecordFields: [
+          count: subscriberCount(record, subscribers),
+          records_returned_by_upstream: subscribers.length,
+          aggregates: safeSubscriberMetadata(record),
+          available_record_fields: [
             ...new Set(
               subscribers.flatMap((subscriber) => (isRecord(subscriber) ? Object.keys(subscriber) : []))
             )
           ].sort(),
-          personalDataIncluded: includeRecords,
+          personal_data_included: includeRecords,
           ...(includeRecords ? { subscribers: subscribers.slice(0, maximum) } : {})
         }
       }),
     getActivity: (filter: 'all' | 'replies-and-mentions' | 'restacks', maximum = 20) =>
-      run(async () => capped(await client.getActivity(filter), maximum)),
+      run(async () => {
+        const response = await client.getActivity(filter)
+        return {
+          activityItems: Array.isArray(response.activityItems)
+            ? response.activityItems.slice(0, maximum).map(compactActivityItem)
+            : [],
+          ...(typeof response.more === 'boolean' ? { more: response.more } : {})
+        }
+      }),
     getUnreadActivity: (maximum = 20) =>
-      run(async () => capped(await client.getUnreadActivity(), maximum)),
-    analyzeContent: (postId: string | number) => getPostAnalytics(postId, 0, false),
-    getSubscriberStats: async (): Promise<ToolResult> => {
-      try {
-        const stats = await client.getSubscriberStats()
+      run(async () => {
+        const response = await client.getUnreadActivity()
         return {
-          content: [{ type: 'text', text: JSON.stringify(stats, null, 2) }],
-          structuredContent: stats as Record<string, unknown>
+          activityItems: response.activityItems.slice(0, maximum).map(compactActivityItem),
+          unread: response.unread,
+          ...(typeof response.more === 'boolean' ? { more: response.more } : {})
         }
-      } catch (error: any) {
+      }),
+    analyzeContent: (postId: string | number) =>
+      run(async () => {
+        const analytics = await loadPostAnalytics(postId, 0, false)
+        const post = isRecord(analytics.post) ? analytics.post : {}
         return {
-          isError: true,
-          content: [{ type: 'text', text: `Failed to fetch subscriber stats: ${error.message}` }]
+          post_id: post.id ?? postId,
+          ...(typeof post.title === 'string' ? { title: post.title } : {}),
+          performance: analytics.stats,
+          engagement: analytics.engagement
         }
-      }
-    },
+      }),
+    getSubscriberStats: () =>
+      run(async () => {
+        const response = await client.getSubscriberStats<Record<string, unknown>>()
+        const record = isRecord(response) ? response : {}
+        const subscribers = Array.isArray(record.subscribers) ? record.subscribers : []
+        const count = optionalSubscriberCount(record, subscribers)
+        return {
+          ...(count !== undefined ? { total_subscribers: count } : {}),
+          ...selectDefined(record, [
+            'active_subscribers_delivered',
+            'recent_signups',
+            'open_rate',
+            'latest_post_title',
+            'derived_from_delivery'
+          ])
+        }
+      }),
     getGrowthSources: (options: GrowthSourcesOptions = {}) =>
       run(async () => {
         const fromDate = options.fromDate ?? options.from_date
@@ -615,7 +955,7 @@ export function createToolHandlers(client: ReadOnlyClient) {
 }
 
 export function createMcpServer(client: ReadOnlyClient): McpServer {
-  const server = new McpServer({ name: 'substack-mcp', version: '0.3.9' })
+  const server = new McpServer({ name: 'substack-mcp', version: '0.3.10' })
   const tools = createToolHandlers(client)
 
   server.registerTool(
@@ -733,23 +1073,38 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
     {
       title: 'Get publication Notes',
       description:
-        'Get a bounded page of Notes from the authenticated publication/profile feed or a specified profile ID.',
-      inputSchema: { profile_id: id.optional(), cursor: z.string().optional(), limit },
+        'Get compact, body-first Notes from the authenticated profile or a specified profile ID. Set fetch_all to follow pagination safely up to max_items.',
+      inputSchema: {
+        profile_id: id.optional(),
+        cursor: z.string().optional(),
+        limit: noteLimit,
+        fetch_all: fetchAll,
+        max_items: maxNoteItems
+      },
       outputSchema: notesOutputSchema,
       annotations: readOnlyAnnotations
     },
-    ({ profile_id, cursor, limit }) => tools.getNotes(cursor, limit, profile_id)
+    ({ profile_id, cursor, limit, fetch_all, max_items }) =>
+      tools.getNotes(cursor, limit, profile_id, fetch_all, max_items)
   )
   server.registerTool(
     'get_profile_notes',
     {
       title: 'Get profile Notes',
-      description: 'Get a bounded profile Notes page with raw per-Note engagement fields.',
-      inputSchema: { profile_id: id, cursor: z.string().optional(), limit },
+      description:
+        'Get compact, body-first Notes for a profile. Set fetch_all to follow pagination safely up to max_items.',
+      inputSchema: {
+        profile_id: id,
+        cursor: z.string().optional(),
+        limit: noteLimit,
+        fetch_all: fetchAll,
+        max_items: maxNoteItems
+      },
       outputSchema: profileNotesOutputSchema,
       annotations: readOnlyAnnotations
     },
-    ({ profile_id, cursor, limit }) => tools.getProfileNotes(profile_id, cursor, limit)
+    ({ profile_id, cursor, limit, fetch_all, max_items }) =>
+      tools.getProfileNotes(profile_id, cursor, limit, fetch_all, max_items)
   )
   server.registerTool(
     'get_note_engagement',
