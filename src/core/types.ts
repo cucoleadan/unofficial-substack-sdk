@@ -509,6 +509,21 @@ export type ActivityFeed = {
   [key: string]: unknown
 }
 
+export interface ActivityPageOptions {
+  /** Defaults to all. */
+  filter?: ActivityFilter
+  /** ISO 8601 timestamp with a timezone and at most millisecond precision. */
+  after?: string
+}
+
+/** A complete upstream activity page with validated historical pagination. */
+export type ActivityPage = ActivityFeed & {
+  activityItems: Array<{ updated_at: string; [key: string]: unknown }>
+  more: boolean
+  /** Last updated_at minus 1 ms in UTC, or null when more is false. */
+  nextAfter: string | null
+}
+
 export type UnreadActivityFeed = ActivityFeed & {
   activityItems: unknown[]
   unread: UnreadActivityMetadata

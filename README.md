@@ -108,6 +108,7 @@ Keep the session token local and out of source control. All MCP tools are read-o
 | `deleteComment(id)` | Permanently deletes an authenticated user's comment. |
 | `setNoteRestack(id, restacked, options)` | Restacks or removes a Note restack. |
 | `getActivity(filter)` | Activity feed. Filters: `all`, `replies-and-mentions`, `restacks`. |
+| `getActivityPage({ filter, after })` | One complete historical activity page with validated `more` and `nextAfter`. |
 | `getUnreadActivity()` | Activity feed annotated using Substack's unread count. |
 | `getFollowing()` | Accounts followed by the authenticated account. |
 | `testConnectivity()` | Whether the session can perform a lightweight API request. |
@@ -205,6 +206,49 @@ const latestFive = (activity.activityItems ?? []).slice(0, 5)
 ```
 
 This is an activity feed, so it can include both replies and mentions. To fetch the comments for one particular post, use `getPostComments(postId)`.
+
+For historical activity, use the separately exported `ActivityPageOptions` and
+`ActivityPage` types with `getActivityPage()`:
+
+```ts
+const firstPage = await client.getActivityPage({ filter: 'all' })
+// The consuming app decides when to request another page.
+if (firstPage.nextAfter !== null) {
+  const olderPage = await client.getActivityPage({
+    filter: 'all',
+    after: firstPage.nextAfter
+  })
+}
+```
+
+Each call makes exactly one authenticated GET to the global
+`/api/v1/activity-feed-web?filter=...` endpoint, adding URL-encoded `after` when
+provided. `filter` defaults to `all` and supports the same filters as
+`getActivity()`. Input cursors and every item's `updated_at` must be valid ISO
+8601 timestamps with a timezone (`Z` or a numeric offset) and at most three
+fractional-second digits.
+
+The result preserves all upstream fields, lookup tables, and every
+`activityItems` record, adding explicit pagination metadata. `more` must be an
+upstream boolean. When `more=true`, `nextAfter` is the **last item's `updated_at`
+minus one millisecond**, formatted as a UTC ISO timestamp. For example,
+`updated_at: 2026-09-05T21:53:10.058Z` produces
+`nextAfter: 2026-09-05T21:53:10.057Z`, even if that item's `created_at` is
+`2026-09-05T21:53:10.062Z`. When `more=false`, `nextAfter` is `null`, including
+on an empty final page. These rules follow observed native Substack pagination.
+
+Items must be ordered by descending `updated_at` (ties allowed). With an `after`
+cursor, no item may be newer than the cursor, and a nonempty page's last item
+must be strictly older than it. Invalid input throws `SubstackConfigurationError`
+before requesting activity. Malformed responses, missing or invalid timestamps,
+unordered items, non-advancing pages, and empty pages with `more=true` throw
+`SubstackApiError`; they are never interpreted as exhaustion.
+
+Grouped activity can be created in April and updated in September. This method
+preserves such records and never filters or paginates by `created_at`.
+`getActivity()` retains its existing raw-response behavior. Date cutoffs,
+automatic pagination, retries, scheduling, persistence, and resumable backfills
+remain the consuming app's responsibility.
 
 ## Publishing Notes
 

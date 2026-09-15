@@ -5,6 +5,8 @@ export {
   ACTIVITY_FILTERS,
   type ActivityFeed,
   type ActivityFilter,
+  type ActivityPage,
+  type ActivityPageOptions,
   type CreateAttachmentRequest,
   type CreateImageAttachmentRequest,
   type CreateLinkAttachmentRequest,

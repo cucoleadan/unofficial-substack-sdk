@@ -3,6 +3,8 @@ import type { EndpointContext } from './transport.js'
 import type {
   ActivityFeed,
   ActivityFilter,
+  ActivityPage,
+  ActivityPageOptions,
   CreateAttachmentRequest,
   CursorOptions,
   DraftNotesOptions,
@@ -40,7 +42,7 @@ import type {
   UploadedImage,
   UpdateScheduledNoteRequest
 } from './types.js'
-import { getActivity, getUnreadActivity } from '../resources/activity/index.js'
+import { getActivity, getActivityPage, getUnreadActivity } from '../resources/activity/index.js'
 import { getAllEmailStats, getEmailStats } from '../resources/email-stats/index.js'
 import { getGrowthSources } from '../resources/growth/index.js'
 import {
@@ -369,6 +371,11 @@ export class SubstackClient {
 
   getUnreadActivity(): Promise<UnreadActivityFeed> {
     return getUnreadActivity(this.endpoints)
+  }
+
+  /** Fetches one complete activity page, validating updated_at ordering and cursor progress. */
+  getActivityPage(options: ActivityPageOptions = {}): Promise<ActivityPage> {
+    return getActivityPage(this.endpoints, options)
   }
 
   getFollowing(): Promise<unknown> {
