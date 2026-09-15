@@ -50,17 +50,16 @@ export async function getActivityPage(
   }
   const items = page.activityItems as unknown[]
   if (page.more && items.length === 0) invalid('an empty page cannot have more=true.')
-  let previous = Infinity
+  let lastUpdatedAt = Infinity
   for (const item of items) {
     const time = timestamp(item && typeof item === 'object' && !Array.isArray(item)
       ? (item as Record<string, unknown>).updated_at : undefined)
     if (time === null) return invalid('each item must have a valid updated_at timestamp.')
-    if (time > previous) invalid('updated_at values must be in descending order (ties allowed).')
-    if (afterTime !== null && time > afterTime) invalid('items must not be newer than the supplied after cursor.')
-    previous = time
+    // Preserve native ranking: grouped notifications need not be ordered by updated_at.
+    lastUpdatedAt = time
   }
-  const nextTime = previous - 1
-  if (items.length && afterTime !== null && previous >= afterTime) {
+  const nextTime = lastUpdatedAt - 1
+  if (items.length && afterTime !== null && nextTime >= afterTime) {
     invalid('the page must advance beyond the supplied after cursor.')
   }
   const nextAfter = page.more ? new Date(nextTime).toISOString() : null

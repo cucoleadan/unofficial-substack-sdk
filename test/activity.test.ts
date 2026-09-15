@@ -65,8 +65,7 @@ describe('historical activity pages', () => {
     { activityItems: [{ created_at: oldest }], more: true },
     { activityItems: [item('bad')], more: false },
     { activityItems: [item('2026-02-30T00:00:00.000Z')], more: true },
-    { activityItems: [item('0000-01-01T00:00:00.000Z')], more: true },
-    { activityItems: [item(), item(recent)], more: false }
+    { activityItems: [item('0000-01-01T00:00:00.000Z')], more: true }
   ]
   for (const [index, response] of malformed.entries()) {
     test(`rejects malformed response ${index} rather than reporting exhaustion`, async () => {
@@ -77,13 +76,34 @@ describe('historical activity pages', () => {
   }
 
   for (const more of [true, false]) {
-    for (const times of [[recent], [oldest], [recent, '2026-09-04T00:00:00.000Z']]) {
+    for (const times of [[recent], ['2026-09-05T21:53:10.059Z']]) {
       test(`rejects non-advancing or out-of-bound pages: ${times.join(',')}, more=${more}`, async () => {
         const { client } = fixture({ activityItems: times.map(time => item(time)), more })
         await expect(client.getActivityPage({ after: oldest })).rejects.toBeInstanceOf(SubstackApiError)
       })
     }
   }
+
+  test('preserves unordered native ranking and derives the cursor from the final item, not the minimum', async () => {
+    const response = { activityItems: [item('2026-09-04T00:00:00.000Z'), item(recent), item()], more: true, users: { '7': { name: 'Ada' } } }
+    const { client, requests } = fixture(response)
+    expect(await client.getActivityPage()).toEqual({ ...response, nextAfter: next })
+    expect(requests).toHaveLength(1)
+  })
+
+  for (const more of [true, false]) {
+    test(`allows grouped items newer than after when the final cursor advances, more=${more}`, async () => {
+      const response = { activityItems: [item(recent), item('2026-09-04T00:00:00.000Z')], more }
+      const { client, requests } = fixture(response)
+      expect(await client.getActivityPage({ after: oldest })).toEqual({ ...response, nextAfter: more ? '2026-09-03T23:59:59.999Z' : null })
+      expect(requests).toHaveLength(1)
+    })
+  }
+
+  test('accepts a final timestamp equal to after when subtracting one millisecond advances the cursor', async () => {
+    const { client } = fixture({ activityItems: [item()], more: true })
+    expect((await client.getActivityPage({ after: oldest })).nextAfter).toBe(next)
+  })
 
   for (const after of ['', 'bad', '2026-02-30T00:00:00Z', '2026-09-05', '2026-09-05T21:53:10',
     '2026-09-05T24:00:00Z', '2026-09-05T21:53:10.0581Z', '2026-09-05T21:53:10+24:00', null, 123]) {
