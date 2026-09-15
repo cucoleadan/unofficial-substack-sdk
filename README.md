@@ -237,11 +237,13 @@ minus one millisecond**, formatted as a UTC ISO timestamp. For example,
 `2026-09-05T21:53:10.062Z`. When `more=false`, `nextAfter` is `null`, including
 on an empty final page. These rules follow observed native Substack pagination.
 
-Items must be ordered by descending `updated_at` (ties allowed). With an `after`
-cursor, no item may be newer than the cursor, and a nonempty page's last item
-must be strictly older than it. Invalid input throws `SubstackConfigurationError`
+Items retain Substack's native ranking, which need not be descending by
+`updated_at`. Individual grouped items may be newer than an `after` cursor.
+For a nonempty page, the final item's `updated_at` minus 1 ms must be strictly
+earlier than the supplied cursor. Do not sort items or use the minimum timestamp
+to derive a cursor. Invalid input throws `SubstackConfigurationError`
 before requesting activity. Malformed responses, missing or invalid timestamps,
-unordered items, non-advancing pages, and empty pages with `more=true` throw
+non-advancing pages, and empty pages with `more=true` throw
 `SubstackApiError`; they are never interpreted as exhaustion.
 
 Grouped activity can be created in April and updated in September. This method
