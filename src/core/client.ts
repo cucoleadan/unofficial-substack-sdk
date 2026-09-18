@@ -33,6 +33,9 @@ import type {
   PostWithEngagementOptions,
   ProfileNotesOptions,
   ProfileNotesPage,
+  ProfileFeedOptions,
+  ProfileFeedPage,
+  ProfileRepliesOptions,
   PublishNoteRequest,
   ProfilePostsOptions,
   ScheduleNoteRequest,
@@ -71,7 +74,9 @@ import {
   getAuthenticatedProfile,
   getFollowing,
   getProfileById,
+  getProfileFeed,
   getProfilePosts,
+  getProfileReplies,
   getPublicProfile
 } from '../resources/profiles/index.js'
 import { getPaidSubscribers, getSubscriberStats } from '../resources/subscriber-stats/index.js'
@@ -169,6 +174,22 @@ export class SubstackClient {
 
   getProfileById(id: number | string): Promise<unknown> {
     return getProfileById(this.endpoints, id)
+  }
+
+  /** Returns one raw page from a profile's authenticated, mixed reader feed. */
+  getProfileFeed(
+    id: number | string,
+    options: ProfileFeedOptions = {}
+  ): Promise<ProfileFeedPage> {
+    return getProfileFeed(this.endpoints, id, options)
+  }
+
+  /** Returns one raw page of comments and replies authored by a profile. */
+  getProfileReplies(
+    id: number | string,
+    options: ProfileRepliesOptions = {}
+  ): Promise<ProfileFeedPage> {
+    return getProfileReplies(this.endpoints, id, options)
   }
 
   getPost(id: string | number): Promise<unknown> {

@@ -87,6 +87,8 @@ Keep the session token local and out of source control. All MCP tools are read-o
 | `getPublicProfile(handle)` | Public profile by handle. |
 | `getProfileById(id)` | Public profile by numeric user ID. |
 | `getProfilePosts(id)` | Posts for a numeric profile ID. |
+| `getProfileFeed(id, { cursor, limit, types })` | One raw page from the authenticated mixed profile feed. |
+| `getProfileReplies(id, { cursor, limit })` | One raw page of comments and replies authored by the profile. |
 | `getProfileNotes(id, { cursor })` | Raw, typed profile Notes feed. |
 | `getPost(id)` | Post by global Substack ID. |
 | `getPostManagementDetail(id)` | Raw, typed author analytics for one Post. Requires `publicationUrl` and publication access. |
@@ -119,7 +121,46 @@ Keep the session token local and out of source control. All MCP tools are read-o
 | `scheduleNote(request)` | Creates a Note draft scheduled for publication at `triggerAt`. |
 | `updateScheduledNote(id, request)` | Updates a scheduled Note draft and its publication time. |
 
-Ordinary endpoint methods, including `getEmailStats()`, `getPostManagementDetail()`, `getNote()`, `getProfileNotes()`, and `getNoteReplies()`, return upstream JSON unchanged. Explicit convenience methods such as `getPostWithEngagement()`, `getNoteWithEngagement()`, and `getUnreadActivity()` add or normalize data. The package exports `SubstackApiError`, `SubstackConfigurationError`, `apiBase`, `ACTIVITY_FILTERS`, and its public TypeScript types. See [Engagement analytics API](docs/engagement-analytics.md) for the observed response structures and field semantics.
+Ordinary endpoint methods, including `getProfileFeed()`, `getProfileReplies()`, `getEmailStats()`, `getPostManagementDetail()`, `getNote()`, `getProfileNotes()`, and `getNoteReplies()`, return upstream JSON unchanged. Explicit convenience methods such as `getPostWithEngagement()`, `getNoteWithEngagement()`, and `getUnreadActivity()` add or normalize data. The package exports `SubstackApiError`, `SubstackConfigurationError`, `apiBase`, `ACTIVITY_FILTERS`, and its public TypeScript types. See [Engagement analytics API](docs/engagement-analytics.md) for the observed response structures and field semantics.
+
+## Authenticated profile feed
+
+`getProfileFeed()` calls the global reader endpoint and returns its mixed items without normalization. An unfiltered page can contain authored Notes, Note restacks, authored posts, post restacks, and other upstream variants. Unknown item, context, publication, post, comment, and pagination fields remain in the returned object.
+
+```ts
+const page = await client.getProfileFeed(44242110, { limit: 20 })
+
+for (const item of page.items) {
+  console.log(item.context?.type, item.context?.source)
+}
+```
+
+Every requested filter is encoded as a repeated `types[]` parameter. Confirmed filters are `note`, `replies`, and `restack`; arbitrary strings remain accepted because this is an undocumented API. `getProfileReplies()` applies `types[]=replies` for authored comments and replies, including activity on other profiles' content. `getProfileNotes()` retains its existing publication-scoped behavior but now also uses the correct `types[]=note` array parameter.
+
+Use `nextCursor` as the next request's `cursor`. The observed `originalCursorTimestamp` field and any additional pagination metadata are retained unchanged.
+
+```ts
+let cursor: string | undefined
+
+do {
+  const page = await client.getProfileReplies(44242110, {
+    cursor,
+    limit: 20
+  })
+
+  for (const item of page.items) {
+    // Process the raw authored reply/comment and its context.
+  }
+
+  cursor = page.nextCursor ?? undefined
+} while (cursor)
+```
+
+For Note restacks (`comment_restack` / `db-restack`), the target and its author fields are normally in `item.comment`. For post restacks (`post_restack` / `db-restack`), the target is in `item.post`, with authors commonly in `post.publishedBylines`; publication author fields can provide fallbacks. The SDK deliberately leaves these payloads raw instead of applying an application-specific author model.
+
+The `restack` filter remains undocumented by Substack. An authenticated comparison on September 18, 2026 used the array form `types[]=restack` and returned both observed variants: 72 Note restacks and 28 post restacks across nine pages. The unfiltered feed remains necessary for complete mixed activity and as a fallback if upstream filter behavior changes.
+
+No complete historical Likes endpoint has been confirmed. A public profile's `hasLikes` value is metadata, not a Likes collection. The singular forms `types=comment`, `types=reply`, and `types=comment_reply`, and their array-form equivalents, are not supported by this SDK as confirmed filters; an empty response alone would not establish that those features never exist.
 
 ## Note engagement
 

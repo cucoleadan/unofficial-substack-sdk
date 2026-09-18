@@ -41,6 +41,20 @@ export interface ProfileNotesOptions extends CursorOptions {
   limit?: number
 }
 
+/** A profile-feed filter accepted by Substack's undocumented reader API. */
+export type ProfileFeedFilter = 'note' | 'replies' | 'restack' | (string & {})
+
+/** Options for one page of a profile's authenticated reader feed. */
+export interface ProfileFeedOptions extends CursorOptions {
+  /** Requested upstream page size. */
+  limit?: number
+  /** Each value is sent as a repeated `types[]` query parameter. */
+  types?: ProfileFeedFilter[]
+}
+
+/** Options for one page of comments and replies authored by a profile. */
+export type ProfileRepliesOptions = Omit<ProfileFeedOptions, 'types'>
+
 export interface NotesOptions extends ProfileNotesOptions {
   profileId?: number | string
 }
@@ -103,6 +117,69 @@ export interface NoteComment {
 export interface NoteFeedItem<TComment extends NoteComment = NoteComment> {
   comment?: TComment
   trackingParameters?: NoteTrackingParameters
+  [key: string]: unknown
+}
+
+/** Raw context attached to an item in the authenticated profile feed. */
+export interface ProfileFeedContext {
+  type?: string
+  source?: string
+  timestamp?: string
+  fallbackUrl?: string
+  users?: Array<{ id?: number | string; handle?: string; [key: string]: unknown }>
+  [key: string]: unknown
+}
+
+/** Fields shared by known and future profile-feed item variants. */
+export interface ProfileFeedItemBase {
+  context?: ProfileFeedContext
+  publication?: Record<string, unknown>
+  publishedBylines?: unknown[]
+  [key: string]: unknown
+}
+
+/** An authored Note (`context.type = "note"`). */
+export interface ProfileNoteFeedItem extends ProfileFeedItemBase {
+  context: ProfileFeedContext & { type: 'note'; source: 'db-note' }
+  comment: Record<string, unknown>
+}
+
+/** A restacked Note (`context.type = "comment_restack"`). */
+export interface ProfileNoteRestackFeedItem extends ProfileFeedItemBase {
+  context: ProfileFeedContext & { type: 'comment_restack'; source: 'db-restack' }
+  comment: Record<string, unknown>
+}
+
+/** An authored post (`context.type = "post"`). */
+export interface ProfilePostFeedItem extends ProfileFeedItemBase {
+  context: ProfileFeedContext & { type: 'post'; source: 'db-post' }
+  post: Record<string, unknown>
+}
+
+/** A restacked post (`context.type = "post_restack"`). */
+export interface ProfilePostRestackFeedItem extends ProfileFeedItemBase {
+  context: ProfileFeedContext & { type: 'post_restack'; source: 'db-restack' }
+  post: Record<string, unknown>
+}
+
+/**
+ * A raw profile-feed item. The base fallback keeps undocumented variants and
+ * fields available to callers as Substack evolves the endpoint.
+ */
+export type ProfileFeedItem =
+  | ProfileNoteFeedItem
+  | ProfileNoteRestackFeedItem
+  | ProfilePostFeedItem
+  | ProfilePostRestackFeedItem
+  | ProfileFeedItemBase
+
+/** An unmodified page from Substack's authenticated profile reader feed. */
+export interface ProfileFeedPage {
+  items: ProfileFeedItem[]
+  /** Supply this value as `cursor` to retrieve the next page. */
+  nextCursor?: string | null
+  /** Upstream pagination metadata retained without normalization. */
+  originalCursorTimestamp?: string
   [key: string]: unknown
 }
 
