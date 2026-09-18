@@ -386,6 +386,19 @@ describe('SubstackClient', () => {
         {
           context: { type: 'reply', source: 'db-comment' },
           comment: { id: 5, parent_id: 1, body: 'Authored reply' }
+        },
+        {
+          context: { type: 'note_like', source: 'db-like' },
+          comment: { id: 6, body: 'Liked Note' }
+        },
+        {
+          context: { type: 'comment_like', source: 'db-like' },
+          comment: { id: 7, parent_id: 6, body: 'Liked comment' },
+          post: { id: 30, publishedBylines: [{ id: 12, handle: 'post-author' }] }
+        },
+        {
+          context: { type: 'post_like', source: 'db-like' },
+          post: { id: 8, publishedBylines: [{ id: 13, handle: 'liked-post-author' }] }
         }
       ],
       nextCursor: 'next page',
@@ -419,14 +432,14 @@ describe('SubstackClient', () => {
     await client.getProfileFeed('44242110', {
       cursor: 'next page',
       limit: 20,
-      types: ['note', 'replies']
+      types: ['note', 'replies', 'like']
     })
 
     const url = new URL(request!.url)
     expect(url.pathname).toBe('/api/v1/reader/feed/profile/44242110')
     expect(url.searchParams.get('cursor')).toBe('next page')
     expect(url.searchParams.get('limit')).toBe('20')
-    expect(url.searchParams.getAll('types[]')).toEqual(['note', 'replies'])
+    expect(url.searchParams.getAll('types[]')).toEqual(['note', 'replies', 'like'])
     expect(url.searchParams.has('types')).toBe(false)
   })
 

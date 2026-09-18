@@ -42,7 +42,7 @@ export interface ProfileNotesOptions extends CursorOptions {
 }
 
 /** A profile-feed filter accepted by Substack's undocumented reader API. */
-export type ProfileFeedFilter = 'note' | 'replies' | 'restack' | (string & {})
+export type ProfileFeedFilter = 'note' | 'replies' | 'restack' | 'like' | (string & {})
 
 /** Options for one page of a profile's authenticated reader feed. */
 export interface ProfileFeedOptions extends CursorOptions {
@@ -162,6 +162,25 @@ export interface ProfilePostRestackFeedItem extends ProfileFeedItemBase {
   post: Record<string, unknown>
 }
 
+/** A liked Note (`context.type = "note_like"`). */
+export interface ProfileNoteLikeFeedItem extends ProfileFeedItemBase {
+  context: ProfileFeedContext & { type: 'note_like'; source: 'db-like' }
+  comment: Record<string, unknown>
+}
+
+/** A liked comment (`context.type = "comment_like"`). */
+export interface ProfileCommentLikeFeedItem extends ProfileFeedItemBase {
+  context: ProfileFeedContext & { type: 'comment_like'; source: 'db-like' }
+  comment: Record<string, unknown>
+  post?: Record<string, unknown>
+}
+
+/** A liked post (`context.type = "post_like"`). */
+export interface ProfilePostLikeFeedItem extends ProfileFeedItemBase {
+  context: ProfileFeedContext & { type: 'post_like'; source: 'db-like' }
+  post: Record<string, unknown>
+}
+
 /**
  * A raw profile-feed item. The base fallback keeps undocumented variants and
  * fields available to callers as Substack evolves the endpoint.
@@ -171,6 +190,9 @@ export type ProfileFeedItem =
   | ProfileNoteRestackFeedItem
   | ProfilePostFeedItem
   | ProfilePostRestackFeedItem
+  | ProfileNoteLikeFeedItem
+  | ProfileCommentLikeFeedItem
+  | ProfilePostLikeFeedItem
   | ProfileFeedItemBase
 
 /** An unmodified page from Substack's authenticated profile reader feed. */

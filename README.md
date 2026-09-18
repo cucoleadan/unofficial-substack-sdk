@@ -128,22 +128,24 @@ Ordinary endpoint methods, including `getProfileFeed()`, `getProfileReplies()`, 
 `getProfileFeed()` calls the global reader endpoint and returns its mixed items without normalization. An unfiltered page can contain authored Notes, Note restacks, authored posts, post restacks, and other upstream variants. Unknown item, context, publication, post, comment, and pagination fields remain in the returned object.
 
 ```ts
-const page = await client.getProfileFeed(44242110, { limit: 20 })
+const profileId = Number(process.env.SUBSTACK_PROFILE_ID!)
+const page = await client.getProfileFeed(profileId, { limit: 20 })
 
 for (const item of page.items) {
   console.log(item.context?.type, item.context?.source)
 }
 ```
 
-Every requested filter is encoded as a repeated `types[]` parameter. Confirmed filters are `note`, `replies`, and `restack`; arbitrary strings remain accepted because this is an undocumented API. `getProfileReplies()` applies `types[]=replies` for authored comments and replies, including activity on other profiles' content. `getProfileNotes()` retains its existing publication-scoped behavior but now also uses the correct `types[]=note` array parameter.
+Every requested filter is encoded as a repeated `types[]` parameter. Confirmed filters are `note`, `replies`, `restack`, and `like`; arbitrary strings remain accepted because this is an undocumented API. `getProfileReplies()` applies `types[]=replies` for authored comments and replies, including activity on other profiles' content. `getProfileNotes()` retains its existing publication-scoped behavior but now also uses the correct `types[]=note` array parameter.
 
 Use `nextCursor` as the next request's `cursor`. The observed `originalCursorTimestamp` field and any additional pagination metadata are retained unchanged.
 
 ```ts
+const profileId = Number(process.env.SUBSTACK_PROFILE_ID!)
 let cursor: string | undefined
 
 do {
-  const page = await client.getProfileReplies(44242110, {
+  const page = await client.getProfileReplies(profileId, {
     cursor,
     limit: 20
   })
@@ -160,22 +162,26 @@ For Note restacks (`comment_restack` / `db-restack`), the target and its author 
 
 The `restack` filter remains undocumented by Substack. An authenticated comparison on September 18, 2026 used the array form `types[]=restack` and returned both observed variants: 72 Note restacks and 28 post restacks across nine pages. The unfiltered feed remains necessary for complete mixed activity and as a fallback if upstream filter behavior changes.
 
-No complete historical Likes endpoint has been confirmed. A public profile's `hasLikes` value is metadata, not a Likes collection. The singular forms `types=comment`, `types=reply`, and `types=comment_reply`, and their array-form equivalents, are not supported by this SDK as confirmed filters; an empty response alone would not establish that those features never exist.
+Use `getProfileFeed(id, { types: ['like'] })` for the paginated Likes feed. An authenticated comparison on September 18, 2026 confirmed `note_like`, `comment_like`, and `post_like` entries with `context.source = "db-like"`, plus `nextCursor` and `originalCursorTimestamp`. Verification followed 30 pages and still had a next cursor, so the endpoint exposes deep history; because the API is undocumented, the SDK does not promise that Substack retains every Like indefinitely. A public profile's `hasLikes` value remains metadata rather than the collection itself.
+
+The singular forms `types=comment`, `types=reply`, and `types=comment_reply`, and their array-form equivalents, are not supported by this SDK as confirmed filters; an empty response alone would not establish that those features never exist.
 
 ## Note engagement
 
 ```ts
-await client.setNoteLike(302607231, true)
-await client.setNoteLike(302607231, false)
+const noteId = Number(process.env.SUBSTACK_NOTE_ID!)
+
+await client.setNoteLike(noteId, true)
+await client.setNoteLike(noteId, false)
 
 const comment = await client.commentOnNote<{ id: number }>(
-  303342892,
+  noteId,
   'Super insightful!'
 )
 await client.deleteComment(comment.id)
 
-await client.setNoteRestack(303342892, true)
-await client.setNoteRestack(303342892, false)
+await client.setNoteRestack(noteId, true)
+await client.setNoteRestack(noteId, false)
 ```
 
 Action methods return Substack's upstream JSON unchanged. `tabId`, `surface`, and `publicationId` have observed defaults and can be overridden through each method's options.
@@ -202,7 +208,8 @@ The candidate fields `comment_count`, `reply_count`, `child_comment_count`, `des
 `getPostWithEngagement(id)` fetches the post and its comments concurrently. It returns the raw visible comment tree in `comments`, the same comments flattened depth-first in `commentItems`, and reported plus calculated visible engagement totals in `engagement`. Automoderated comments are excluded by default; request them separately with `includeAutomodHidden: true`.
 
 ```ts
-const result = await client.getPostWithEngagement(193463596, {
+const postId = Number(process.env.SUBSTACK_POST_ID!)
+const result = await client.getPostWithEngagement(postId, {
   includeAutomodHidden: true
 })
 
@@ -229,8 +236,9 @@ The email-stats endpoint requires `limit=20`; larger values currently return HTT
 `shares` and `restacks` are separate upstream counters. `opened` and `clicked` also appear alongside `opens` and `clicks`; consumers should preserve those raw fields rather than assuming undocumented equivalence. `getPostManagementDetail()` can additionally return link-level click tuples in `posts[].stats.links`.
 
 ```ts
+const postId = Number(process.env.SUBSTACK_POST_ID!)
 const emailPage = await client.getEmailStats()
-const detail = await client.getPostManagementDetail(193463596)
+const detail = await client.getPostManagementDetail(postId)
 
 console.log(emailPage.rows?.[0]?.shares)
 console.log(emailPage.rows?.[0]?.restacks)
@@ -338,9 +346,11 @@ await client.publishNote({
 Use `createNoteBodyJson` to turn explicit `@handle` occurrences into Substack person-tag nodes. Each tag needs the person's public Substack user ID, handle, and display name.
 
 ```ts
+const taggedProfileId = Number(process.env.SUBSTACK_PROFILE_ID!)
+
 await client.scheduleNote({
-  bodyJson: createNoteBodyJson('Scheduled note for @dancn', [
-    { id: 44242110, handle: 'dancn', label: 'Dan Cucolea' }
+  bodyJson: createNoteBodyJson('Scheduled note for @exampleauthor', [
+    { id: taggedProfileId, handle: 'exampleauthor', label: 'Example Author' }
   ]),
   tabId: 'subscribed',
   surface: 'feed',
@@ -360,7 +370,9 @@ const drafts = await client.getDraftNotes({ limit: 20 })
 `updateScheduledNote` updates a draft's content, publication time, and optional attachments. It sends `triggerAt` as Substack's `trigger_at` field and forwards attachment IDs from `attachmentIds`.
 
 ```ts
-await client.updateScheduledNote(289737400, {
+const scheduledNoteId = Number(process.env.SUBSTACK_SCHEDULED_NOTE_ID!)
+
+await client.updateScheduledNote(scheduledNoteId, {
   bodyJson: { type: 'doc', attrs: { schemaVersion: 'v1' }, content: [] },
   replyMinimumRole: 'everyone',
   attachmentIds: ['attachment-or-note-id'],
@@ -371,7 +383,8 @@ await client.updateScheduledNote(289737400, {
 `deleteNote` permanently deletes a Note or Note draft. Confirm the ID before calling it.
 
 ```ts
-await client.deleteNote(296235019)
+const noteId = Number(process.env.SUBSTACK_NOTE_ID!)
+await client.deleteNote(noteId)
 ```
 
 ## Development
