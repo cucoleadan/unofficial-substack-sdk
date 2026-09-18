@@ -248,7 +248,10 @@ describe('SubstackClient', () => {
 
     await client.getProfileNotes(123)
 
-    expect(request?.url).toBe('https://newsletter.example.com/api/v1/reader/feed/profile/123?types=note')
+    const url = new URL(request!.url)
+    expect(url.origin).toBe('https://newsletter.example.com')
+    expect(url.pathname).toBe('/api/v1/reader/feed/profile/123')
+    expect(url.searchParams.getAll('types[]')).toEqual(['note'])
     expect(request?.headers.get('cookie')).toBe('substack.sid=session-value')
   })
 
@@ -277,7 +280,7 @@ describe('SubstackClient', () => {
     expect(urls).toEqual([
       'https://substack.com/api/v1/handle/options',
       'https://substack.com/api/v1/user/authorhandle/public_profile',
-      'https://newsletter.example.com/api/v1/reader/feed/profile/12345?types=note'
+      'https://newsletter.example.com/api/v1/reader/feed/profile/12345?types%5B%5D=note'
     ])
     expect(result.items).toHaveLength(1)
   })
@@ -319,7 +322,7 @@ describe('SubstackClient', () => {
     await client.getNotes({ profileId: 42, cursor: 'next page', limit: 10 })
 
     expect(request?.url).toBe(
-      'https://allagentsconsidered.substack.com/api/v1/reader/feed/profile/42?types=note&limit=10&cursor=next+page'
+      'https://allagentsconsidered.substack.com/api/v1/reader/feed/profile/42?types%5B%5D=note&limit=10&cursor=next+page'
     )
   })
 
@@ -346,8 +349,140 @@ describe('SubstackClient', () => {
     expect(page).toEqual(response)
     expect(page.items?.[0]?.comment?.restacks).toBe(3)
     expect(request?.url).toBe(
-      'https://allagentsconsidered.substack.com/api/v1/reader/feed/profile/7?types=note'
+      'https://allagentsconsidered.substack.com/api/v1/reader/feed/profile/7?types%5B%5D=note'
     )
+  })
+
+  test('returns an unfiltered global profile-feed page without changing its variants or metadata', async () => {
+    let request: Request | undefined
+    const response = {
+      items: [
+        {
+          context: { type: 'note', source: 'db-note', timestamp: '2026-09-01T10:00:00Z' },
+          comment: { id: 1, handle: 'author' },
+          undocumented: { retained: true }
+        },
+        {
+          context: { type: 'comment_restack', source: 'db-restack' },
+          comment: { id: 2, user_id: 9, name: 'Original Author', handle: 'original' }
+        },
+        {
+          context: { type: 'post', source: 'db-post' },
+          post: { id: 3, title: 'Authored post' },
+          publication: { id: 11, name: 'Publication' }
+        },
+        {
+          context: {
+            type: 'post_restack',
+            source: 'db-restack',
+            fallbackUrl: 'https://example.com/post'
+          },
+          post: {
+            id: 4,
+            publishedBylines: [{ id: 10, handle: 'post-author' }],
+            futurePostField: 'preserved'
+          }
+        },
+        {
+          context: { type: 'reply', source: 'db-comment' },
+          comment: { id: 5, parent_id: 1, body: 'Authored reply' }
+        },
+        {
+          context: { type: 'note_like', source: 'db-like' },
+          comment: { id: 6, body: 'Liked Note' }
+        },
+        {
+          context: { type: 'comment_like', source: 'db-like' },
+          comment: { id: 7, parent_id: 6, body: 'Liked comment' },
+          post: { id: 30, publishedBylines: [{ id: 12, handle: 'post-author' }] }
+        },
+        {
+          context: { type: 'post_like', source: 'db-like' },
+          post: { id: 8, publishedBylines: [{ id: 13, handle: 'liked-post-author' }] }
+        }
+      ],
+      nextCursor: 'next page',
+      originalCursorTimestamp: '2026-09-01T09:00:00Z',
+      hasMore: true,
+      futurePaginationField: { retained: true }
+    }
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async (input, init) => {
+        request = new Request(input, init)
+        return Response.json(response)
+      }
+    })
+
+    await expect(client.getProfileFeed(44242110)).resolves.toEqual(response)
+    expect(request?.url).toBe('https://substack.com/api/v1/reader/feed/profile/44242110')
+    expect(request?.headers.get('cookie')).toBe('substack.sid=session-value')
+  })
+
+  test('encodes profile-feed pagination and every type as repeated array parameters', async () => {
+    let request: Request | undefined
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async (input, init) => {
+        request = new Request(input, init)
+        return Response.json({ items: [], nextCursor: null })
+      }
+    })
+
+    await client.getProfileFeed('44242110', {
+      cursor: 'next page',
+      limit: 20,
+      types: ['note', 'replies', 'like']
+    })
+
+    const url = new URL(request!.url)
+    expect(url.pathname).toBe('/api/v1/reader/feed/profile/44242110')
+    expect(url.searchParams.get('cursor')).toBe('next page')
+    expect(url.searchParams.get('limit')).toBe('20')
+    expect(url.searchParams.getAll('types[]')).toEqual(['note', 'replies', 'like'])
+    expect(url.searchParams.has('types')).toBe(false)
+  })
+
+  test('delegates profile replies to the generic feed with the replies array filter', async () => {
+    let request: Request | undefined
+    const response = {
+      items: [{ context: { type: 'reply' }, comment: { id: 5, body: 'Authored reply' } }],
+      nextCursor: 'reply cursor',
+      serverTiming: { retained: true }
+    }
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async (input, init) => {
+        request = new Request(input, init)
+        return Response.json(response)
+      }
+    })
+
+    await expect(client.getProfileReplies(7, { cursor: 'first page', limit: 10 })).resolves.toEqual(
+      response
+    )
+
+    const url = new URL(request!.url)
+    expect(url.searchParams.getAll('types[]')).toEqual(['replies'])
+    expect(url.searchParams.get('cursor')).toBe('first page')
+    expect(url.searchParams.get('limit')).toBe('10')
+  })
+
+  test('validates profile-feed inputs and preserves the existing API error model', async () => {
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async () => Response.json({ error: 'expired session' }, { status: 401 })
+    })
+
+    expect(() => client.getProfileFeed(0)).toThrow(SubstackConfigurationError)
+    expect(() => client.getProfileFeed(7, { limit: 0 })).toThrow(SubstackConfigurationError)
+    expect(() => client.getProfileFeed(7, { types: [''] })).toThrow(SubstackConfigurationError)
+    await expect(client.getProfileReplies(7)).rejects.toMatchObject({
+      name: SubstackApiError.name,
+      status: 401,
+      url: 'https://substack.com/api/v1/reader/feed/profile/7?types%5B%5D=replies',
+      detail: '{"error":"expired session"}'
+    })
   })
 
   test('gets a typed Note by numeric or string ID without changing the response', async () => {

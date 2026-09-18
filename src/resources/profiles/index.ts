@@ -1,7 +1,13 @@
 import { SubstackApiError, SubstackConfigurationError } from '../../core/errors.js'
 import type { EndpointContext } from '../../core/transport.js'
 import { positiveInteger } from '../../core/validation.js'
-import type { ProfilePostsOptions } from '../../core/types.js'
+import type {
+  ProfileFeedFilter,
+  ProfileFeedOptions,
+  ProfileFeedPage,
+  ProfilePostsOptions,
+  ProfileRepliesOptions
+} from '../../core/types.js'
 
 type ProfileFeedItem = {
   context?: {
@@ -42,6 +48,45 @@ export async function getProfileById(context: EndpointContext, id: number | stri
   }
 
   return getPublicProfile(context, user.handle)
+}
+
+function profileFeedFilter(value: ProfileFeedFilter): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new SubstackConfigurationError('Profile feed filters must be non-empty strings.')
+  }
+  return value
+}
+
+/** Returns one raw page from a profile's authenticated, mixed reader feed. */
+export function getProfileFeed(
+  context: EndpointContext,
+  id: number | string,
+  options: ProfileFeedOptions = {}
+): Promise<ProfileFeedPage> {
+  const profileId = positiveInteger(id, 'Profile ID')
+  const query = new URLSearchParams()
+
+  if (options.limit !== undefined) {
+    query.set('limit', String(positiveInteger(options.limit, 'Profile feed limit')))
+  }
+  if (options.cursor) {
+    query.set('cursor', options.cursor)
+  }
+  for (const type of options.types ?? []) {
+    query.append('types[]', profileFeedFilter(type))
+  }
+
+  const search = query.size ? `?${query.toString()}` : ''
+  return context.global(`/reader/feed/profile/${profileId}${search}`)
+}
+
+/** Returns one raw page of comments and replies authored by a profile. */
+export function getProfileReplies(
+  context: EndpointContext,
+  id: number | string,
+  options: ProfileRepliesOptions = {}
+): Promise<ProfileFeedPage> {
+  return getProfileFeed(context, id, { ...options, types: ['replies'] })
 }
 
 export function getProfilePosts(

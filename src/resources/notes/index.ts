@@ -83,7 +83,8 @@ export function getProfileNotes<
   options: ProfileNotesOptions = {}
 ): Promise<ProfileNotesPage<T>> {
   const profileId = positiveInteger(id, 'Profile ID')
-  const query = new URLSearchParams({ types: 'note' })
+  const query = new URLSearchParams()
+  query.append('types[]', 'note')
   if (options.limit !== undefined) {
     query.set('limit', String(positiveInteger(options.limit, 'Profile Notes limit')))
   }
