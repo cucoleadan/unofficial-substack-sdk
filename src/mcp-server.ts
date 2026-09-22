@@ -6,7 +6,9 @@ import {
   SubstackConfigurationError,
   type EmailStatsOptions,
   type EmailStatsRow,
-  type GrowthSourcesOptions
+  type FollowingOptions,
+  type GrowthSourcesOptions,
+  type SubscriptionsOptions
 } from './core/index.js'
 
 type ReadOnlyClient = Pick<
@@ -25,6 +27,8 @@ type ReadOnlyClient = Pick<
   | 'getActivity'
   | 'getUnreadActivity'
   | 'getGrowthSources'
+  | 'getFollowing'
+  | 'getSubscriptions'
 >
 
 type ToolResult = {
@@ -133,6 +137,14 @@ const authenticatedProfileOutputSchema = {
       bio: z.string().optional()
     })
     .passthrough()
+}
+
+const followingOutputSchema = {
+  data: z.record(z.string(), z.unknown())
+}
+
+const subscriptionsOutputSchema = {
+  data: z.union([z.array(z.unknown()), z.record(z.string(), z.unknown())])
 }
 
 const recentPostsOutputSchema = {
@@ -1056,12 +1068,16 @@ export function createToolHandlers(client: ReadOnlyClient) {
           throw new SubstackConfigurationError('Growth sources fromDate cannot be after toDate.')
         }
         return client.getGrowthSources(options)
-      })
+      }),
+    getFollowing: (profileId?: string | number) =>
+      run(async () => client.getFollowing(profileId ? { profileId } : {})),
+    getSubscriptions: (options: SubscriptionsOptions = {}) =>
+      run(async () => client.getSubscriptions(options))
   }
 }
 
 export function createMcpServer(client: ReadOnlyClient): McpServer {
-  const server = new McpServer({ name: 'substack-mcp', version: '0.3.12' })
+  const server = new McpServer({ name: 'substack-mcp', version: '0.3.16' })
   const tools = createToolHandlers(client)
 
   const register = (
@@ -1087,6 +1103,40 @@ export function createMcpServer(client: ReadOnlyClient): McpServer {
       annotations: readOnlyAnnotations
     },
     () => tools.getAuthenticatedProfile()
+  )
+  register(
+    ['get_following', 'getFollowing'],
+    {
+      title: 'Get followed accounts',
+      description: 'Get accounts followed by the authenticated user or a specified profile ID.',
+      inputSchema: {
+        profile_id: id.optional(),
+        profileId: id.optional()
+      },
+      outputSchema: followingOutputSchema,
+      annotations: readOnlyAnnotations
+    },
+    (args: any) => tools.getFollowing(args.profile_id ?? args.profileId)
+  )
+  register(
+    ['get_subscriptions', 'getSubscriptions'],
+    {
+      title: 'Get publication subscriptions',
+      description:
+        'Get publication subscriptions for the authenticated user, or public subscriptions for a specified handle or profile ID.',
+      inputSchema: {
+        handle: z.string().optional(),
+        profile_id: id.optional(),
+        profileId: id.optional()
+      },
+      outputSchema: subscriptionsOutputSchema,
+      annotations: readOnlyAnnotations
+    },
+    (args: any) =>
+      tools.getSubscriptions({
+        handle: args.handle,
+        profileId: args.profile_id ?? args.profileId
+      })
   )
   register(
     ['get_recent_posts', 'getRecentPosts'],

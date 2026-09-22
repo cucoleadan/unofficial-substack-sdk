@@ -13,6 +13,7 @@ import type {
   EmailStatsPage,
   EmailStatsRow,
   FetchLike,
+  FollowingOptions,
   GrowthSourceItem,
   GrowthSourcesOptions,
   GrowthSourcesResponse,
@@ -40,6 +41,7 @@ import type {
   ProfilePostsOptions,
   ScheduleNoteRequest,
   SubstackClientOptions,
+  SubscriptionsOptions,
   SubscriberStatsResponse,
   UnreadActivityFeed,
   UploadedImage,
@@ -77,7 +79,8 @@ import {
   getProfileFeed,
   getProfilePosts,
   getProfileReplies,
-  getPublicProfile
+  getPublicProfile,
+  getSubscriptions
 } from '../resources/profiles/index.js'
 import { getPaidSubscribers, getSubscriberStats } from '../resources/subscriber-stats/index.js'
 
@@ -399,13 +402,17 @@ export class SubstackClient {
     return getActivityPage(this.endpoints, options)
   }
 
-  getFollowing(): Promise<unknown> {
-    return getFollowing(this.endpoints)
+  getFollowing(options: FollowingOptions = {}): Promise<unknown> {
+    return getFollowing(this.endpoints, options)
+  }
+
+  getSubscriptions(options: SubscriptionsOptions = {}): Promise<unknown> {
+    return getSubscriptions(this.endpoints, options)
   }
 
   async testConnectivity(): Promise<boolean> {
     try {
-      await this.endpoints.put('/user-setting', { type: 'last_home_tab', value_text: 'inbox' })
+      await this.endpoints.global('/handle/options')
       return true
     } catch {
       return false

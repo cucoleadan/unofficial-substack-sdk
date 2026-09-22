@@ -2,11 +2,13 @@ import { SubstackApiError, SubstackConfigurationError } from '../../core/errors.
 import type { EndpointContext } from '../../core/transport.js'
 import { positiveInteger } from '../../core/validation.js'
 import type {
+  FollowingOptions,
   ProfileFeedFilter,
   ProfileFeedOptions,
   ProfileFeedPage,
   ProfilePostsOptions,
-  ProfileRepliesOptions
+  ProfileRepliesOptions,
+  SubscriptionsOptions
 } from '../../core/types.js'
 
 type ProfileFeedItem = {
@@ -98,11 +100,33 @@ export function getProfilePosts(
   return context.global(`/profile/posts?profile_user_id=${profileId}`)
 }
 
-export async function getFollowing(context: EndpointContext): Promise<unknown> {
-  const settings = await context.put<{ user_id?: unknown }>('/user-setting', {
-    type: 'last_home_tab',
-    value_text: 'inbox'
-  })
-  const userId = positiveInteger(Number(settings.user_id), 'Authenticated user ID')
+export async function getFollowing(
+  context: EndpointContext,
+  options: FollowingOptions = {}
+): Promise<unknown> {
+  let profileId = options.profileId
+  if (!profileId) {
+    const profile = (await getAuthenticatedProfile(context)) as { id?: number | string }
+    if (!profile?.id) {
+      throw new SubstackApiError('Authenticated Substack profile ID was not found.', 502, '/handle/options')
+    }
+    profileId = profile.id
+  }
+  const userId = positiveInteger(profileId, 'Profile ID')
   return context.publication(`/user/${userId}/subscriber-lists?lists=following`)
+}
+
+export async function getSubscriptions(
+  context: EndpointContext,
+  options: SubscriptionsOptions = {}
+): Promise<unknown> {
+  if (options.handle) {
+    const profile = (await getPublicProfile(context, options.handle)) as Record<string, unknown>
+    return profile?.subscriptions ?? []
+  }
+  if (options.profileId) {
+    const profile = (await getProfileById(context, options.profileId)) as Record<string, unknown>
+    return profile?.subscriptions ?? []
+  }
+  return context.global('/subscriptions')
 }

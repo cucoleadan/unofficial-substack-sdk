@@ -75,6 +75,9 @@ Keep the session token local and out of source control. All MCP tools are read-o
 | `get_paid_subscribers` | Structured breakdown of paid vs free subscribers, subscription tiers (comp, gift, trial, founding), and pledges. |
 | `get_activity` | Bounded activity filtered by all events, replies and mentions, or restacks. |
 | `get_unread_activity` | Bounded unread activity plus unread metadata. |
+| `get_growth_sources` | Historical publication traffic, subscriber acquisition, and revenue by referrer channel. |
+| `get_following` | Accounts followed by the authenticated account or a specified profile ID. |
+| `get_subscriptions` | Publication subscriptions for the authenticated account or public subscriptions for a handle/profile ID. |
 | `analyze_content` | Compact complete analytics for one post without comment or raw-response payloads. |
 
 `get_publication_analytics` follows every email-stat page before calculating its summary, so it can make several authenticated requests for a large archive. Raw rows are excluded by default and capped when requested. `get_notes` and `get_profile_notes` default to 10 complete Note bodies; set `fetch_all: true` to follow every cursor up to `max_items` (default 500, maximum 5,000). `get_subscriber_summary` excludes subscriber records by default because they can contain email addresses and other personal data. See [MCP analytics](docs/mcp-analytics.md) for output semantics and usage examples.
@@ -112,8 +115,9 @@ Keep the session token local and out of source control. All MCP tools are read-o
 | `getActivity(filter)` | Activity feed. Filters: `all`, `replies-and-mentions`, `restacks`. |
 | `getActivityPage({ filter, after })` | One complete historical activity page with validated `more` and `nextAfter`. |
 | `getUnreadActivity()` | Activity feed annotated using Substack's unread count. |
-| `getFollowing()` | Accounts followed by the authenticated account. |
-| `testConnectivity()` | Whether the session can perform a lightweight API request. |
+| `getFollowing({ profileId })` | Accounts followed by the authenticated account (or explicit profile ID). Resolves profile ID automatically if omitted. |
+| `getSubscriptions({ handle, profileId })` | Publication subscriptions for the authenticated account (or public subscriptions for a handle or profile ID). |
+| `testConnectivity()` | Whether the session can perform a lightweight authenticated API request. |
 | `uploadImage(dataUrl)` | Uploads a base64 data-URL image and returns Substack media metadata. |
 | `createImageAttachment(uploadedImage)` | Creates a Note image attachment from an uploaded image. |
 | `createAttachment(request)` | Creates a link or image attachment for a Note. |

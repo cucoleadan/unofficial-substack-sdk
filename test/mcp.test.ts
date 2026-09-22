@@ -108,6 +108,12 @@ const mockClient = (overrides: Record<string, unknown> = {}) => ({
     sourceMetrics: [{ source: 'substack', sourceName: 'Substack' }],
     totals: [{ name: 'traffic', total: 149 }]
   }),
+  getFollowing: async () => ({
+    subscriberLists: [{ id: 'following', name: 'Following', groups: [] }]
+  }),
+  getSubscriptions: async () => [
+    { publication_id: 101, publication: { name: 'Tech Insights' } }
+  ],
   ...overrides
 })
 
@@ -144,6 +150,14 @@ describe('MCP tools', () => {
         has_more: false,
         cursor: null
       }
+    })
+    expect((await tools.getFollowing()).structuredContent).toEqual({
+      data: {
+        subscriberLists: [{ id: 'following', name: 'Following', groups: [] }]
+      }
+    })
+    expect((await tools.getSubscriptions()).structuredContent).toEqual({
+      data: [{ publication_id: 101, publication: { name: 'Tech Insights' } }]
     })
   })
 

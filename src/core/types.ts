@@ -59,6 +59,19 @@ export interface NotesOptions extends ProfileNotesOptions {
   profileId?: number | string
 }
 
+export interface FollowingOptions {
+  /** Explicit Substack profile/user ID. If omitted, the authenticated account's ID is discovered automatically. */
+  profileId?: number | string
+}
+
+export interface SubscriptionsOptions {
+  /** Optional profile handle to retrieve public subscriptions for another account. If omitted, returns the authenticated user's subscriptions. */
+  handle?: string
+  /** Optional profile ID to retrieve public subscriptions for another account. */
+  profileId?: number | string
+}
+
+
 export interface NoteActionOptions {
   /** Feed tab context sent to Substack. Defaults to `for-you`. */
   tabId?: string

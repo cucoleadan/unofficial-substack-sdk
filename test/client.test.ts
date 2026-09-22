@@ -1470,6 +1470,130 @@ describe('SubstackClient', () => {
     })
   })
 
+  test('getFollowing resolves authenticated user ID via /handle/options when profileId is omitted', async () => {
+    const urls: string[] = []
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://newsletter.example.com',
+      fetch: async (input) => {
+        const url = new Request(input).url
+        urls.push(url)
+        if (url.endsWith('/handle/options')) {
+          return Response.json({
+            potentialHandles: [{ handle: 'testauthor', type: 'existing' }]
+          })
+        }
+        if (url.includes('/user/testauthor/public_profile')) {
+          return Response.json({ id: 44242110, handle: 'testauthor', name: 'Test Author' })
+        }
+        if (url.includes('/subscriber-lists?lists=following')) {
+          return Response.json({
+            subscriberLists: [{ id: 'following', name: 'Following', groups: [{ users: [{ id: 101 }] }] }]
+          })
+        }
+        return Response.json({})
+      }
+    })
+
+    const result = (await client.getFollowing()) as { subscriberLists: unknown[] }
+    expect(urls).toEqual([
+      'https://substack.com/api/v1/handle/options',
+      'https://substack.com/api/v1/user/testauthor/public_profile',
+      'https://newsletter.example.com/api/v1/user/44242110/subscriber-lists?lists=following'
+    ])
+    expect(result.subscriberLists).toHaveLength(1)
+  })
+
+  test('getFollowing uses explicit profileId and skips discovery calls', async () => {
+    const urls: string[] = []
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      publicationUrl: 'https://newsletter.example.com',
+      fetch: async (input) => {
+        const url = new Request(input).url
+        urls.push(url)
+        return Response.json({
+          subscriberLists: [{ id: 'following', name: 'Following', groups: [] }]
+        })
+      }
+    })
+
+    await client.getFollowing({ profileId: 44242110 })
+    expect(urls).toEqual([
+      'https://newsletter.example.com/api/v1/user/44242110/subscriber-lists?lists=following'
+    ])
+  })
+
+  test('testConnectivity verifies authenticated session via GET /handle/options', async () => {
+    const requests: Request[] = []
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async (input, init) => {
+        const req = new Request(input, init)
+        requests.push(req)
+        return Response.json({
+          potentialHandles: [{ handle: 'testauthor', type: 'existing' }]
+        })
+      }
+    })
+
+    const isConnected = await client.testConnectivity()
+    expect(isConnected).toBe(true)
+    expect(requests).toHaveLength(1)
+    expect(requests[0].method).toBe('GET')
+    expect(requests[0].url).toBe('https://substack.com/api/v1/handle/options')
+  })
+
+  test('testConnectivity returns false on authentication or network failure', async () => {
+    const failingClient = new SubstackClient({
+      sessionToken: 'bad-session',
+      fetch: async () => Response.json({ error: 'unauthorized' }, { status: 401 })
+    })
+
+    const isConnected = await failingClient.testConnectivity()
+    expect(isConnected).toBe(false)
+  })
+
+  test('getSubscriptions fetches authenticated user subscriptions when options are omitted', async () => {
+    const urls: string[] = []
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async (input) => {
+        const url = new Request(input).url
+        urls.push(url)
+        return Response.json([{ id: 1, publication: { name: 'Tech Newsletter' } }])
+      }
+    })
+
+    const subscriptions = (await client.getSubscriptions()) as Array<{ id: number }>
+    expect(urls).toEqual(['https://substack.com/api/v1/subscriptions'])
+    expect(subscriptions).toHaveLength(1)
+    expect(subscriptions[0].id).toBe(1)
+  })
+
+  test('getSubscriptions extracts subscriptions for explicit handle or profileId', async () => {
+    const urls: string[] = []
+    const client = new SubstackClient({
+      sessionToken: 'session-value',
+      fetch: async (input) => {
+        const url = new Request(input).url
+        urls.push(url)
+        if (url.includes('/public_profile')) {
+          return Response.json({
+            id: 10,
+            subscriptions: [{ publication_id: 101, membership_state: 'subscribed' }]
+          })
+        }
+        return Response.json({})
+      }
+    })
+
+    const byHandle = (await client.getSubscriptions({ handle: 'otheruser' })) as Array<{ publication_id: number }>
+    expect(urls).toEqual(['https://substack.com/api/v1/user/otheruser/public_profile'])
+    expect(byHandle).toHaveLength(1)
+    expect(byHandle[0].publication_id).toBe(101)
+  })
+
   test('surfaces configuration and upstream API errors predictably', async () => {
     const noPublication = new SubstackClient({ sessionToken: 'session-value' })
     expect(() => noPublication.getProfileNotes(123)).toThrow(SubstackConfigurationError)
