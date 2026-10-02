@@ -1,0 +1,50 @@
+{
+  "note": "Request body sent for schedule-response.json. Substack stored it without the two empty paragraphs.",
+  "bodyJson": {
+    "type": "doc",
+    "attrs": {
+      "schemaVersion": "v1",
+      "title": null
+    },
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "sdk probe A, hello "
+          },
+          {
+            "type": "substack_mention",
+            "attrs": {
+              "id": 1001,
+              "label": "Example Author",
+              "mentionType": "user",
+              "url": null
+            }
+          },
+          {
+            "type": "text",
+            "text": " end"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": []
+      },
+      {
+        "type": "paragraph"
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "after blanks ünïcødé 🚀"
+          }
+        ]
+      }
+    ]
+  }
+}
