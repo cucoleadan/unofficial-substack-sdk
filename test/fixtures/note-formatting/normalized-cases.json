@@ -1,0 +1,1952 @@
+{
+  "marks-normalized": {
+    "sent": {
+      "type": "doc",
+      "attrs": {
+        "schemaVersion": "v1",
+        "title": null
+      },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Automated SDK formatting test (sdk-format-test marks). This Note will be deleted."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "plain "
+            },
+            {
+              "type": "text",
+              "text": "bold ",
+              "marks": [
+                {
+                  "type": "bold"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "italic ",
+              "marks": [
+                {
+                  "type": "italic"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "strike ",
+              "marks": [
+                {
+                  "type": "strike"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "code",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "bold italic",
+              "marks": [
+                {
+                  "type": "bold"
+                },
+                {
+                  "type": "italic"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " and "
+            },
+            {
+              "type": "text",
+              "text": "bold strike",
+              "marks": [
+                {
+                  "type": "bold"
+                },
+                {
+                  "type": "strike"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "stored": {
+      "type": "doc",
+      "attrs": {
+        "schemaVersion": "v1",
+        "title": null
+      },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Automated SDK formatting test (sdk-format-test marks). This Note will be deleted."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "plain "
+            },
+            {
+              "type": "text",
+              "text": "bold ",
+              "marks": [
+                {
+                  "type": "bold"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "italic ",
+              "marks": [
+                {
+                  "type": "italic"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "strike ",
+              "marks": [
+                {
+                  "type": "strike"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "code",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "bold italic",
+              "marks": [
+                {
+                  "type": "bold"
+                },
+                {
+                  "type": "italic"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " and "
+            },
+            {
+              "type": "text",
+              "text": "bold strike",
+              "marks": [
+                {
+                  "type": "bold"
+                },
+                {
+                  "type": "strike"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "links-normalized": {
+    "sent": {
+      "type": "doc",
+      "attrs": {
+        "schemaVersion": "v1",
+        "title": null
+      },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Automated SDK formatting test (sdk-format-test links). This Note will be deleted."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "A "
+            },
+            {
+              "type": "text",
+              "text": "https://example.com/a?b=1&c=two#frag",
+              "marks": [
+                {
+                  "type": "link",
+                  "attrs": {
+                    "href": "https://example.com/a?b=1&c=two#frag",
+                    "target": "_blank",
+                    "rel": "nofollow ugc noopener",
+                    "class": "note-link"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " in text."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "https://example.com/bold",
+              "marks": [
+                {
+                  "type": "bold"
+                },
+                {
+                  "type": "link",
+                  "attrs": {
+                    "href": "https://example.com/bold",
+                    "target": "_blank",
+                    "rel": "nofollow ugc noopener",
+                    "class": "note-link"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "https://example.com/bare",
+              "marks": [
+                {
+                  "type": "link",
+                  "attrs": {
+                    "href": "https://example.com/bare"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "https://example.com/autolink",
+              "marks": [
+                {
+                  "type": "link",
+                  "attrs": {
+                    "href": "https://example.com/autolink",
+                    "target": "_blank",
+                    "rel": "nofollow ugc noopener",
+                    "class": "note-link"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Unicode ünï 🚀 ",
+              "marks": [
+                {
+                  "type": "italic"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "https://example.com/ü?q=ü",
+              "marks": [
+                {
+                  "type": "link",
+                  "attrs": {
+                    "href": "https://example.com/ü?q=ü",
+                    "target": "_blank",
+                    "rel": "nofollow ugc noopener",
+                    "class": "note-link"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "stored": {
+      "type": "doc",
+      "attrs": {
+        "schemaVersion": "v1",
+        "title": null
+      },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Automated SDK formatting test (sdk-format-test links). This Note will be deleted."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "A "
+            },
+            {
+              "type": "text",
+              "text": "https://example.com/a?b=1&c=two#frag",
+              "marks": [
+                {
+                  "type": "link",
+                  "attrs": {
+                    "href": "https://example.com/a?b=1&c=two#frag",
+                    "target": "_blank",
+                    "rel": "nofollow ugc noopener",
+                    "class": "note-link"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " in text."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "https://example.com/bold",
+              "marks": [
+                {
+                  "type": "bold"
+                },
+                {
+                  "type": "link",
+                  "attrs": {
+                    "href": "https://example.com/bold",
+                    "target": "_blank",
+                    "rel": "nofollow ugc noopener",
+                    "class": "note-link"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "https://example.com/bare",
+              "marks": [
+                {
+                  "type": "link",
+                  "attrs": {
+                    "href": "https://example.com/bare"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "https://example.com/autolink",
+              "marks": [
+                {
+                  "type": "link",
+                  "attrs": {
+                    "href": "https://example.com/autolink",
+                    "target": "_blank",
+                    "rel": "nofollow ugc noopener",
+                    "class": "note-link"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Unicode ünï 🚀 ",
+              "marks": [
+                {
+                  "type": "italic"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "https://example.com/ü?q=ü",
+              "marks": [
+                {
+                  "type": "link",
+                  "attrs": {
+                    "href": "https://example.com/ü?q=ü",
+                    "target": "_blank",
+                    "rel": "nofollow ugc noopener",
+                    "class": "note-link"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "mentions-normalized": {
+    "sent": {
+      "type": "doc",
+      "attrs": {
+        "schemaVersion": "v1",
+        "title": null
+      },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Automated SDK formatting test (sdk-format-test mentions). This Note will be deleted."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Hello "
+            },
+            {
+              "type": "substack_mention",
+              "attrs": {
+                "id": 1001,
+                "label": "Example Author",
+                "mentionType": "user",
+                "url": null
+              }
+            },
+            {
+              "type": "text",
+              "text": ", and again "
+            },
+            {
+              "type": "substack_mention",
+              "attrs": {
+                "id": 1001,
+                "label": "Example Author",
+                "mentionType": "user",
+                "url": null
+              }
+            },
+            {
+              "type": "text",
+              "text": "!"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "substack_mention",
+              "attrs": {
+                "id": 1001,
+                "label": "Example Author",
+                "mentionType": "user",
+                "url": null
+              }
+            },
+            {
+              "type": "text",
+              "text": " at the start, then a "
+            },
+            {
+              "type": "text",
+              "text": "https://example.com/m",
+              "marks": [
+                {
+                  "type": "link",
+                  "attrs": {
+                    "href": "https://example.com/m",
+                    "target": "_blank",
+                    "rel": "nofollow ugc noopener",
+                    "class": "note-link"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " next to "
+            },
+            {
+              "type": "substack_mention",
+              "attrs": {
+                "id": 1001,
+                "label": "Example Author",
+                "mentionType": "user",
+                "url": null
+              }
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Mention with a URL: "
+            },
+            {
+              "type": "substack_mention",
+              "attrs": {
+                "id": 1001,
+                "label": "Example Author",
+                "mentionType": "user",
+                "url": "https://substack.com/@exampleauthor"
+              }
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Bold around "
+            },
+            {
+              "type": "substack_mention",
+              "attrs": {
+                "id": 1001,
+                "label": "Example Author",
+                "mentionType": "user",
+                "url": null
+              },
+              "marks": [
+                {
+                  "type": "bold"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " mention."
+            }
+          ]
+        }
+      ]
+    },
+    "stored": {
+      "type": "doc",
+      "attrs": {
+        "schemaVersion": "v1",
+        "title": null
+      },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Automated SDK formatting test (sdk-format-test mentions). This Note will be deleted."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Hello "
+            },
+            {
+              "type": "substack_mention",
+              "attrs": {
+                "id": 1001,
+                "label": "Example Author",
+                "mentionType": "user",
+                "url": null
+              }
+            },
+            {
+              "type": "text",
+              "text": ", and again "
+            },
+            {
+              "type": "substack_mention",
+              "attrs": {
+                "id": 1001,
+                "label": "Example Author",
+                "mentionType": "user",
+                "url": null
+              }
+            },
+            {
+              "type": "text",
+              "text": "!"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "substack_mention",
+              "attrs": {
+                "id": 1001,
+                "label": "Example Author",
+                "mentionType": "user",
+                "url": null
+              }
+            },
+            {
+              "type": "text",
+              "text": " at the start, then a "
+            },
+            {
+              "type": "text",
+              "text": "https://example.com/m",
+              "marks": [
+                {
+                  "type": "link",
+                  "attrs": {
+                    "href": "https://example.com/m",
+                    "target": "_blank",
+                    "rel": "nofollow ugc noopener",
+                    "class": "note-link"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " next to "
+            },
+            {
+              "type": "substack_mention",
+              "attrs": {
+                "id": 1001,
+                "label": "Example Author",
+                "mentionType": "user",
+                "url": null
+              }
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Mention with a URL: "
+            },
+            {
+              "type": "substack_mention",
+              "attrs": {
+                "id": 1001,
+                "label": "Example Author",
+                "mentionType": "user",
+                "url": "https://substack.com/@exampleauthor"
+              }
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Bold around "
+            },
+            {
+              "type": "substack_mention",
+              "attrs": {
+                "id": 1001,
+                "label": "Example Author",
+                "mentionType": "user",
+                "url": null
+              },
+              "marks": [
+                {
+                  "type": "bold"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " mention."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "lists-normalized": {
+    "sent": {
+      "type": "doc",
+      "attrs": {
+        "schemaVersion": "v1",
+        "title": null
+      },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Automated SDK formatting test (sdk-format-test lists). This Note will be deleted."
+            }
+          ]
+        },
+        {
+          "type": "bulletList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "first bullet"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "second "
+                    },
+                    {
+                      "type": "text",
+                      "text": "bold",
+                      "marks": [
+                        {
+                          "type": "bold"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "orderedList",
+          "attrs": {
+            "start": 1
+          },
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "one"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "two"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "orderedList",
+          "attrs": {
+            "start": 3
+          },
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "three"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "four"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "bulletList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "outer"
+                    }
+                  ]
+                },
+                {
+                  "type": "bulletList",
+                  "content": [
+                    {
+                      "type": "listItem",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "nested"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "orderedList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "ordered without attrs"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "stored": {
+      "type": "doc",
+      "attrs": {
+        "schemaVersion": "v1",
+        "title": null
+      },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Automated SDK formatting test (sdk-format-test lists). This Note will be deleted."
+            }
+          ]
+        },
+        {
+          "type": "bulletList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "first bullet"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "second "
+                    },
+                    {
+                      "type": "text",
+                      "text": "bold",
+                      "marks": [
+                        {
+                          "type": "bold"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "orderedList",
+          "attrs": {
+            "start": 1
+          },
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "one"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "two"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "orderedList",
+          "attrs": {
+            "start": 3
+          },
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "three"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "four"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "bulletList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "outer"
+                    }
+                  ]
+                },
+                {
+                  "type": "bulletList",
+                  "content": [
+                    {
+                      "type": "listItem",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "nested"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "orderedList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "ordered without attrs"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "blocks-normalized": {
+    "sent": {
+      "type": "doc",
+      "attrs": {
+        "schemaVersion": "v1",
+        "title": null
+      },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Automated SDK formatting test (sdk-format-test blocks). This Note will be deleted."
+            }
+          ]
+        },
+        {
+          "type": "blockquote",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "quoted line one"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "quoted "
+                },
+                {
+                  "type": "text",
+                  "text": "two",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "codeBlock",
+          "attrs": {
+            "language": null
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "const a = 1\nconst b = 2"
+            }
+          ]
+        },
+        {
+          "type": "codeBlock",
+          "content": [
+            {
+              "type": "text",
+              "text": "code block without attrs"
+            }
+          ]
+        }
+      ]
+    },
+    "stored": {
+      "type": "doc",
+      "attrs": {
+        "schemaVersion": "v1",
+        "title": null
+      },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Automated SDK formatting test (sdk-format-test blocks). This Note will be deleted."
+            }
+          ]
+        },
+        {
+          "type": "blockquote",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "quoted line one"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "quoted "
+                },
+                {
+                  "type": "text",
+                  "text": "two",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "codeBlock",
+          "attrs": {
+            "language": null
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "const a = 1\nconst b = 2"
+            }
+          ]
+        },
+        {
+          "type": "codeBlock",
+          "content": [
+            {
+              "type": "text",
+              "text": "code block without attrs"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "whitespace-normalized": {
+    "sent": {
+      "type": "doc",
+      "attrs": {
+        "schemaVersion": "v1",
+        "title": null
+      },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Automated SDK formatting test (sdk-format-test whitespace). This Note will be deleted."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "  leading and trailing spaces  "
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "double  spaces and\ttab"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "after empty paragraph"
+            }
+          ]
+        }
+      ]
+    },
+    "stored": {
+      "type": "doc",
+      "attrs": {
+        "schemaVersion": "v1",
+        "title": null
+      },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Automated SDK formatting test (sdk-format-test whitespace). This Note will be deleted."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "  leading and trailing spaces  "
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "double  spaces and\ttab"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "after empty paragraph"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "markdown": {
+    "sent": {
+      "type": "doc",
+      "attrs": {
+        "schemaVersion": "v1",
+        "title": null
+      },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Automated SDK formatting test (sdk-format-test markdown). This Note will be deleted."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Hi "
+            },
+            {
+              "type": "substack_mention",
+              "attrs": {
+                "id": 1001,
+                "label": "Example Author",
+                "mentionType": "user",
+                "url": null
+              }
+            },
+            {
+              "type": "text",
+              "text": ", "
+            },
+            {
+              "type": "text",
+              "text": "bold ",
+              "marks": [
+                {
+                  "type": "bold"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "italic ",
+              "marks": [
+                {
+                  "type": "italic"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "strike ",
+              "marks": [
+                {
+                  "type": "strike"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "code",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " both",
+              "marks": [
+                {
+                  "type": "bold"
+                },
+                {
+                  "type": "italic"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " and "
+            },
+            {
+              "type": "text",
+              "text": "https://example.com/a_b?c=1",
+              "marks": [
+                {
+                  "type": "link",
+                  "attrs": {
+                    "href": "https://example.com/a_b?c=1",
+                    "target": "_blank",
+                    "rel": "nofollow ugc noopener",
+                    "class": "note-link"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "substack_mention",
+              "attrs": {
+                "id": 1001,
+                "label": "Example Author",
+                "mentionType": "user",
+                "url": null
+              },
+              "marks": [
+                {
+                  "type": "bold"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " and "
+            },
+            {
+              "type": "text",
+              "text": "https://example.com/bold",
+              "marks": [
+                {
+                  "type": "bold"
+                },
+                {
+                  "type": "link",
+                  "attrs": {
+                    "href": "https://example.com/bold",
+                    "target": "_blank",
+                    "rel": "nofollow ugc noopener",
+                    "class": "note-link"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " then a plain *star*."
+            }
+          ]
+        },
+        {
+          "type": "bulletList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "first"
+                    }
+                  ]
+                },
+                {
+                  "type": "bulletList",
+                  "content": [
+                    {
+                      "type": "listItem",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "nested "
+                            },
+                            {
+                              "type": "text",
+                              "text": "item",
+                              "marks": [
+                                {
+                                  "type": "italic"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "second"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "orderedList",
+          "attrs": {
+            "start": 3
+          },
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "three"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "four"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "blockquote",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "quoted "
+                },
+                {
+                  "type": "text",
+                  "text": "line",
+                  "marks": [
+                    {
+                      "type": "bold"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "codeBlock",
+          "attrs": {
+            "language": "ts"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "const a = 1"
+            }
+          ]
+        }
+      ]
+    },
+    "stored": {
+      "type": "doc",
+      "attrs": {
+        "schemaVersion": "v1",
+        "title": null
+      },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Automated SDK formatting test (sdk-format-test markdown). This Note will be deleted."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Hi "
+            },
+            {
+              "type": "substack_mention",
+              "attrs": {
+                "id": 1001,
+                "label": "Example Author",
+                "mentionType": "user",
+                "url": null
+              }
+            },
+            {
+              "type": "text",
+              "text": ", "
+            },
+            {
+              "type": "text",
+              "text": "bold ",
+              "marks": [
+                {
+                  "type": "bold"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "italic ",
+              "marks": [
+                {
+                  "type": "italic"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "strike ",
+              "marks": [
+                {
+                  "type": "strike"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "code",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " both",
+              "marks": [
+                {
+                  "type": "bold"
+                },
+                {
+                  "type": "italic"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " and "
+            },
+            {
+              "type": "text",
+              "text": "https://example.com/a_b?c=1",
+              "marks": [
+                {
+                  "type": "link",
+                  "attrs": {
+                    "href": "https://example.com/a_b?c=1",
+                    "target": "_blank",
+                    "rel": "nofollow ugc noopener",
+                    "class": "note-link"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "substack_mention",
+              "attrs": {
+                "id": 1001,
+                "label": "Example Author",
+                "mentionType": "user",
+                "url": null
+              },
+              "marks": [
+                {
+                  "type": "bold"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " and "
+            },
+            {
+              "type": "text",
+              "text": "https://example.com/bold",
+              "marks": [
+                {
+                  "type": "bold"
+                },
+                {
+                  "type": "link",
+                  "attrs": {
+                    "href": "https://example.com/bold",
+                    "target": "_blank",
+                    "rel": "nofollow ugc noopener",
+                    "class": "note-link"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " then a plain *star*."
+            }
+          ]
+        },
+        {
+          "type": "bulletList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "first"
+                    }
+                  ]
+                },
+                {
+                  "type": "bulletList",
+                  "content": [
+                    {
+                      "type": "listItem",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "nested "
+                            },
+                            {
+                              "type": "text",
+                              "text": "item",
+                              "marks": [
+                                {
+                                  "type": "italic"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "second"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "orderedList",
+          "attrs": {
+            "start": 3
+          },
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "three"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "four"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "blockquote",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "quoted "
+                },
+                {
+                  "type": "text",
+                  "text": "line",
+                  "marks": [
+                    {
+                      "type": "bold"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "codeBlock",
+          "attrs": {
+            "language": "ts"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "const a = 1"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

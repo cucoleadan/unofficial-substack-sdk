@@ -1,0 +1,106 @@
+{
+  "user_id": 1001,
+  "body": "sdk probe A, hello @Example Author end\n\nafter blanks ünïcødé 🚀",
+  "body_json": {
+    "type": "doc",
+    "attrs": {
+      "schemaVersion": "v1",
+      "title": null
+    },
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "sdk probe A, hello "
+          },
+          {
+            "type": "substack_mention",
+            "attrs": {
+              "id": 1001,
+              "label": "Example Author",
+              "mentionType": "user",
+              "url": null
+            }
+          },
+          {
+            "type": "text",
+            "text": " end"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "after blanks ünïcødé 🚀"
+          }
+        ]
+      }
+    ]
+  },
+  "post_id": null,
+  "publication_id": null,
+  "media_clip_id": null,
+  "type": "feed",
+  "status": "draft",
+  "reply_minimum_role": "everyone",
+  "id": 900000001,
+  "deleted": false,
+  "date": "2026-10-01T13:36:02.750Z",
+  "name": "Example Author",
+  "photo_url": "https://substack-post-media.s3.amazonaws.com/public/images/00000000-0000-4000-8000-000000000000_64x64.jpeg",
+  "reactions": {
+    "❤": 0
+  },
+  "children": [],
+  "userStatus": {
+    "bestsellerTier": null,
+    "subscriberTier": 1,
+    "leaderboard": null,
+    "vip": false,
+    "badge": {
+      "type": "subscriber",
+      "tier": 1,
+      "accent_colors": null
+    },
+    "subscriber": null
+  },
+  "user_bestseller_tier": null,
+  "reaction_count": 0,
+  "restacks": 0,
+  "restacked": false,
+  "children_count": 0,
+  "attachments": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "type": "image",
+      "imageUrl": "https://substack-post-media.s3.amazonaws.com/public/images/00000000-0000-4000-8000-000000000002_64x48.png",
+      "imageWidth": 64,
+      "imageHeight": 48,
+      "explicit": false
+    }
+  ],
+  "user_primary_publication": {
+    "id": 2002,
+    "subdomain": "example",
+    "custom_domain_optional": false,
+    "name": "Example Publication",
+    "author_id": 1001,
+    "primary_user_id": 1001,
+    "user_id": 1001,
+    "handles_enabled": false,
+    "explicit": false,
+    "is_personal_mode": false,
+    "payments_state": "disabled",
+    "pledges_enabled": false,
+    "has_reply_rules": false
+  },
+  "language": null,
+  "autotranslate_to": null,
+  "is_ai_detection_disabled": false,
+  "is_ai_generated_text": false,
+  "trigger_at": "2026-10-11T13:36:03.735Z"
+}

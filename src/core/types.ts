@@ -290,18 +290,117 @@ export interface NoteWithEngagement {
   engagement: NoteEngagement
 }
 
-/** Options for the authenticated account's scheduled Note drafts. */
-export interface DraftNotesOptions {
-  /** Maximum drafts to return. Defaults to 20. */
+/** Options for one page of the authenticated account's Note drafts. */
+export interface DraftNotesOptions extends CursorOptions {
+  /** Maximum drafts to return, from 1 to 100. Defaults to 20. */
   limit?: number
 }
 
-/** An unmodified page from Substack's scheduled Note drafts endpoint. */
-export type DraftNotesPage<T = unknown> = {
+/** Options for retrieving every Note draft across pages. */
+export interface AllDraftNotesOptions {
+  /** Maximum drafts to return, from 1 to 10,000. Defaults to 500. */
+  maxItems?: number
+  /** Drafts requested per page, from 1 to 100. Defaults to 100. */
+  pageSize?: number
+}
+
+/**
+ * Who may reply to a Note. Substack stores `null` when the field is omitted,
+ * which behaves like `everyone`.
+ */
+export type NoteReplyMinimumRole = 'everyone' | 'free_subscriber' | 'paid_subscriber'
+
+/**
+ * A loosely typed ProseMirror-style Note document as stored by Substack.
+ * `createNoteBodyJson` produces the stricter `NoteBodyJson` subset.
+ */
+export interface NoteBodyDocument {
+  type: 'doc' | (string & {})
+  attrs?: Record<string, unknown>
+  content?: Array<Record<string, unknown>>
+  [key: string]: unknown
+}
+
+/** Link metadata Substack resolves for a link attachment. */
+export interface NoteLinkMetadata {
+  url?: string
+  host?: string
+  title?: string
+  [key: string]: unknown
+}
+
+/**
+ * A Note attachment returned by the attachment endpoint and embedded in
+ * drafts. Image attachments carry `imageUrl`; link attachments carry
+ * `linkMetadata`. Unknown attachment types and fields are retained.
+ */
+export interface NoteAttachment {
+  /** Attachment ID to pass in `attachmentIds`. */
+  id: string
+  type: 'image' | 'link' | 'video' | 'poll' | 'post' | 'publication' | 'user' | 'missing' | (string & {})
+  imageUrl?: string
+  imageWidth?: number
+  imageHeight?: number
+  linkMetadata?: NoteLinkMetadata
+  explicit?: boolean
+  [key: string]: unknown
+}
+
+/**
+ * A Note draft as returned by `GET /feed/drafts`. Scheduled and unscheduled
+ * drafts share this shape; unscheduled drafts have `trigger_at: null`.
+ */
+export interface DraftNote {
+  /** Draft comment ID. Use it with `updateScheduledNote` and `deleteNote`. */
+  id: number
+  /** Plain-text rendering; paragraphs are separated by a blank line and mentions appear as `@Label`. */
+  body?: string
+  body_json?: NoteBodyDocument | null
+  /** ISO 8601 publication time, or null for an unscheduled draft. */
+  trigger_at?: string | null
+  /** Draft creation time. */
+  date?: string
+  edited_at?: string | null
+  reply_minimum_role?: NoteReplyMinimumRole | null
+  attachments?: NoteAttachment[]
+  user_id?: number
+  /** `feed` for Notes. */
+  type?: string
+  publication_id?: number | null
+  post_id?: number | null
+  media_clip_id?: number | null
+  ancestor_path?: string
+  [key: string]: unknown
+}
+
+/** An unmodified page from Substack's Note drafts endpoint. */
+export type DraftNotesPage<T = DraftNote> = {
   drafts?: T[]
   hasMore?: boolean
-  nextCursor?: unknown
+  /** Supply this value as `cursor` to retrieve the next page. */
+  nextCursor?: string | null
   [key: string]: unknown
+}
+
+/**
+ * The draft comment returned when a Note draft is created or updated. It
+ * carries the draft fields plus comment metadata such as `status: "draft"`.
+ */
+export interface ScheduledNoteResponse extends DraftNote {
+  status?: 'draft' | (string & {})
+  deleted?: boolean
+}
+
+/**
+ * The comment returned after publishing a Note. Substack's web client builds
+ * the Note URL from `id` and the author's `user_id`.
+ */
+export interface PublishNoteResponse extends NoteComment {
+  id: number
+  user_id?: number
+  body?: string
+  body_json?: NoteBodyDocument | null
+  attachments?: NoteAttachment[]
 }
 
 export interface ProfilePostsOptions {
@@ -523,6 +622,18 @@ export interface CreateImageAttachmentRequest {
 /** Payload accepted by Substack's Note attachment endpoint. */
 export type CreateAttachmentRequest = CreateLinkAttachmentRequest | CreateImageAttachmentRequest
 
+/** Binary image data accepted by `uploadImage`. */
+export type ImageUploadData = Blob | ArrayBuffer | Uint8Array
+
+/** Options for uploading binary image data. */
+export interface UploadImageOptions {
+  /**
+   * Image media type, such as `image/png`. Required for `ArrayBuffer` and
+   * `Uint8Array`; defaults to `Blob.type` for a `Blob`.
+   */
+  contentType?: string
+}
+
 /** Metadata returned after uploading an image to Substack. */
 export interface UploadedImage {
   id: number
@@ -543,6 +654,11 @@ export interface NotePersonTag {
   label: string
   /** Optional profile URL stored by Substack. Defaults to null. */
   url?: string | null
+  /**
+   * `user` (the default) or `pub` for a publication. Only
+   * `markdownToNoteBodyJson` accepts publication mentions.
+   */
+  mentionType?: 'user' | 'pub' | (string & {})
 }
 
 export interface NoteBodyTextNode {
@@ -567,6 +683,120 @@ export interface NoteBodyParagraphNode {
   content: NoteBodyInlineNode[]
 }
 
+/** A bold, italic, strikethrough, or inline-code mark. */
+export interface NoteSimpleMark {
+  type: 'bold' | 'italic' | 'strike' | 'code'
+}
+
+/**
+ * A link mark. Substack's editor sets `target`, `rel`, and `class`; Substack
+ * stores whatever attributes are sent. Notes always display the URL as the
+ * link text.
+ */
+export interface NoteLinkMark {
+  type: 'link'
+  attrs: {
+    href: string
+    target?: string | null
+    rel?: string | null
+    class?: string | null
+  }
+}
+
+/** A mark that Substack Notes support. */
+export type NoteTextMark = NoteSimpleMark | NoteLinkMark
+
+/** A text node with optional formatting marks. */
+export interface NoteRichTextNode {
+  type: 'text'
+  text: string
+  marks?: NoteTextMark[]
+}
+
+/** A mention of a user (`mentionType: "user"`) or publication (`"pub"`). */
+export interface NoteRichMentionNode {
+  type: 'substack_mention'
+  attrs: {
+    id: number
+    label: string
+    mentionType: 'user' | 'pub' | (string & {})
+    url: string | null
+  }
+  marks?: NoteTextMark[]
+}
+
+export type NoteRichInlineNode = NoteRichTextNode | NoteRichMentionNode
+
+export interface NoteRichParagraphNode {
+  type: 'paragraph'
+  content?: NoteRichInlineNode[]
+}
+
+export interface NoteRichListItemNode {
+  type: 'listItem'
+  /** A paragraph, optionally followed by nested lists. */
+  content: Array<NoteRichParagraphNode | NoteRichBulletListNode | NoteRichOrderedListNode>
+}
+
+export interface NoteRichBulletListNode {
+  type: 'bulletList'
+  content: NoteRichListItemNode[]
+}
+
+export interface NoteRichOrderedListNode {
+  type: 'orderedList'
+  attrs?: { start?: number }
+  content: NoteRichListItemNode[]
+}
+
+export interface NoteRichBlockquoteNode {
+  type: 'blockquote'
+  /** Usually paragraphs; Substack's editor also allows lists in a quote. */
+  content: Array<NoteRichParagraphNode | NoteRichBulletListNode | NoteRichOrderedListNode>
+}
+
+export interface NoteRichCodeBlockNode {
+  type: 'codeBlock'
+  attrs?: { language?: string | null }
+  /** Unformatted text; lines are separated by `\n`. */
+  content?: NoteRichTextNode[]
+}
+
+/** A block that Substack Notes support. */
+export type NoteRichBlockNode =
+  | NoteRichParagraphNode
+  | NoteRichBulletListNode
+  | NoteRichOrderedListNode
+  | NoteRichBlockquoteNode
+  | NoteRichCodeBlockNode
+
+/**
+ * A formatted Note document using only the nodes and marks Substack Notes
+ * support: paragraphs, bulleted and numbered lists, quotes, code blocks,
+ * mentions, and bold, italic, strikethrough, code, and link marks.
+ */
+export interface NoteRichDocument {
+  type: 'doc'
+  attrs?: { schemaVersion?: 'v1'; title?: null }
+  content: NoteRichBlockNode[]
+}
+
+/** Markdown and person tags recovered by `noteBodyJsonToMarkdown`. */
+export interface NoteBodyMarkdown {
+  /** Note Markdown; see `markdownToNoteBodyJson` for the supported syntax. */
+  markdown: string
+  /** One tag per mentioned user or publication; pass back to `markdownToNoteBodyJson`. */
+  personTags: NotePersonTag[]
+}
+
+/** Plain text and person tags recovered by `noteBodyJsonToText`. */
+export interface NoteBodyText {
+  /** One line per paragraph, with mentions written as `@Label`. */
+  text: string
+  /** One tag per mentioned person; pass back to `createNoteBodyJson`. */
+  personTags: NotePersonTag[]
+}
+
 /** Note document produced by createNoteBodyJson. */
 export interface NoteBodyJson {
   type: 'doc'
@@ -586,28 +816,68 @@ export interface NoteBodyJson {
  */
 export interface PublishNoteRequest {
   bodyJson: unknown
+  /** Feed tab context, such as `for-you`. */
   tabId: string
+  /** Interaction surface, such as `feed`. */
   surface: string
-  replyMinimumRole: 'everyone'
+  replyMinimumRole: NoteReplyMinimumRole
+  /**
+   * Up to 6 attachment IDs. Images may be combined with one link; Substack
+   * rejects two link attachments on one Note.
+   */
   attachmentIds?: string[]
+  /**
+   * ID of a saved draft to publish now. Substack publishes the Note under
+   * that same ID and removes the draft, as its web composer does.
+   */
+  draftCommentId?: number
 }
 
 /** Payload for scheduling a Note through Substack's draft endpoint. */
 export interface ScheduleNoteRequest extends PublishNoteRequest {
-  /** ISO 8601 timestamp at which Substack should publish the Note. */
+  /**
+   * ISO 8601 timestamp at which Substack should publish the Note. It must be
+   * in the future and at most 92 days ahead.
+   */
   triggerAt: string
+}
+
+/** Payload for creating an unscheduled Note draft. */
+export interface CreateDraftNoteRequest {
+  /** The ProseMirror-style Note document accepted by Substack's web API. */
+  bodyJson: unknown
+  replyMinimumRole: NoteReplyMinimumRole
+  /** Up to 6 attachment IDs, as for `PublishNoteRequest`. */
+  attachmentIds?: string[]
+  /** Feed tab context. Optional; Substack accepts drafts without it. */
+  tabId?: string
+  /** Interaction surface. Optional; Substack accepts drafts without it. */
+  surface?: string
 }
 
 /** Payload for editing a scheduled Note draft. */
 export interface UpdateScheduledNoteRequest {
   /** The ProseMirror-style Note document accepted by Substack's web API. */
   bodyJson: unknown
-  replyMinimumRole: 'everyone'
-  /** IDs of attachments to retain on or add to the scheduled Note. */
+  replyMinimumRole: NoteReplyMinimumRole
+  /**
+   * The draft's complete attachment ID list. Substack replaces the draft's
+   * attachments with this list, so omitting it removes every attachment.
+   */
   attachmentIds?: string[]
-  /** ISO 8601 timestamp at which Substack should publish the updated Note. */
+  /**
+   * ISO 8601 timestamp at which Substack should publish the updated Note.
+   * It must be in the future and at most 92 days ahead.
+   */
   triggerAt: string
 }
+
+/**
+ * Payload for removing a draft's schedule. Substack requires the full draft
+ * content on every update, so the body, reply role, and attachments are
+ * sent again.
+ */
+export type UnscheduleNoteRequest = Omit<UpdateScheduledNoteRequest, 'triggerAt'>
 
 export interface UnreadActivityMetadata {
   count: number

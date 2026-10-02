@@ -1,0 +1,161 @@
+{
+  "POST /comment/draft trigger_at not a date": {
+    "status": 400,
+    "json": {
+      "errors": [
+        {
+          "location": "body",
+          "param": "trigger_at",
+          "value": "not-a-date",
+          "msg": "Invalid value"
+        }
+      ]
+    }
+  },
+  "POST /comment/draft trigger_at more than 92 days ahead": {
+    "status": 400,
+    "json": {
+      "error": "trigger_at cannot be more than 92 days in the future",
+      "type": "single"
+    }
+  },
+  "POST /comment/draft 20,000-character body": {
+    "status": 400,
+    "json": {
+      "error": "Please type a shorter comment",
+      "type": "single"
+    }
+  },
+  "POST /comment/draft without bodyJson": {
+    "status": 400,
+    "json": {
+      "error": "Please add a comment or an attachment.",
+      "type": "single"
+    }
+  },
+  "POST /comment/draft with an empty document": {
+    "status": 400,
+    "json": {
+      "error": "Please type a comment",
+      "type": "single"
+    }
+  },
+  "POST /comment/draft with an unknown attachment ID": {
+    "status": 400,
+    "json": {
+      "errors": [
+        {
+          "location": "body",
+          "param": "attachmentIds",
+          "value": [
+            "00000000-0000-4000-8000-000000000019"
+          ],
+          "msg": "Invalid value"
+        }
+      ]
+    }
+  },
+  "POST /comment/draft with an unknown replyMinimumRole": {
+    "status": 400,
+    "json": {
+      "errors": [
+        {
+          "location": "body",
+          "param": "replyMinimumRole",
+          "value": "bogus",
+          "msg": "Invalid value"
+        }
+      ]
+    }
+  },
+  "POST /comment/draft with two link attachments": {
+    "status": 400,
+    "json": {
+      "error": ""
+    }
+  },
+  "POST /comment/draft with seven image attachments": {
+    "status": 400,
+    "json": {
+      "error": ""
+    }
+  },
+  "POST /comment/attachment with an invalid URL": {
+    "status": 400,
+    "json": {
+      "errors": [
+        {
+          "location": "body",
+          "param": "url",
+          "value": "not a url",
+          "msg": "Invalid URL"
+        }
+      ]
+    }
+  },
+  "POST /image with a non-image data URL": {
+    "status": 400,
+    "json": {
+      "error": "Invalid data uri",
+      "type": "single"
+    }
+  },
+  "POST /image with raw base64 instead of a data URL": {
+    "status": 400,
+    "json": {
+      "errors": [
+        {
+          "location": "body",
+          "param": "image",
+          "value": "<base64 image elided>",
+          "msg": "Invalid value"
+        }
+      ]
+    }
+  },
+  "POST /image larger than the upload limit": {
+    "status": 413,
+    "json": {
+      "error": "Your upload is too large.",
+      "type": "single"
+    }
+  },
+  "GET /feed/drafts?limit=101": {
+    "status": 400,
+    "json": {
+      "errors": [
+        {
+          "location": "query",
+          "param": "limit",
+          "value": 101,
+          "msg": "Invalid value"
+        }
+      ]
+    }
+  },
+  "GET /feed/drafts with a malformed cursor": {
+    "status": 400,
+    "json": {
+      "error": "Invalid cursor format",
+      "type": "single"
+    }
+  },
+  "DELETE /comment/{id} for an already deleted draft": {
+    "status": 403,
+    "json": ""
+  },
+  "POST /comment/draft with trigger_at in the past": {
+    "status": 400,
+    "json": {
+      "error": "trigger_at must be in the future",
+      "type": "single"
+    }
+  },
+  "PATCH /feed/comment/{id} without bodyJson": {
+    "status": 400,
+    "json": {
+      "error": "Please add a comment or an attachment.",
+      "type": "single"
+    }
+  }
+}

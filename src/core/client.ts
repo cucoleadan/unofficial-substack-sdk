@@ -1,12 +1,15 @@
-import { SubstackApiError, SubstackConfigurationError } from './errors.js'
+import { parseUpstreamError, SubstackApiError, SubstackConfigurationError } from './errors.js'
 import type { EndpointContext } from './transport.js'
 import type {
   ActivityFeed,
   ActivityFilter,
   ActivityPage,
   ActivityPageOptions,
+  AllDraftNotesOptions,
   CreateAttachmentRequest,
+  CreateDraftNoteRequest,
   CursorOptions,
+  DraftNote,
   DraftNotesOptions,
   DraftNotesPage,
   EmailStatsOptions,
@@ -17,6 +20,8 @@ import type {
   GrowthSourceItem,
   GrowthSourcesOptions,
   GrowthSourcesResponse,
+  ImageUploadData,
+  NoteAttachment,
   NoteComment,
   NoteCommentOptions,
   NoteFeedItem,
@@ -38,13 +43,17 @@ import type {
   ProfileFeedPage,
   ProfileRepliesOptions,
   PublishNoteRequest,
+  PublishNoteResponse,
   ProfilePostsOptions,
   ScheduleNoteRequest,
+  ScheduledNoteResponse,
   SubstackClientOptions,
   SubscriptionsOptions,
   SubscriberStatsResponse,
   UnreadActivityFeed,
   UploadedImage,
+  UnscheduleNoteRequest,
+  UploadImageOptions,
   UpdateScheduledNoteRequest
 } from './types.js'
 import { getActivity, getActivityPage, getUnreadActivity } from '../resources/activity/index.js'
@@ -53,9 +62,11 @@ import { getGrowthSources } from '../resources/growth/index.js'
 import {
   commentOnNote,
   createAttachment,
+  createDraftNote,
   createImageAttachment,
   deleteComment,
   deleteNote,
+  getAllDraftNotes,
   getComment,
   getDraftNotes,
   getNote,
@@ -68,6 +79,7 @@ import {
   scheduleNote,
   setNoteLike,
   setNoteRestack,
+  unscheduleNote,
   uploadImage,
   updateScheduledNote
 } from '../resources/notes/index.js'
@@ -143,6 +155,7 @@ export class SubstackClient {
   private readonly globalApiBase: string
   private readonly publicationApiBase?: string
   private readonly sessionCookie: string
+  private readonly sessionToken: string
   private readonly endpoints: EndpointContext
 
   constructor(options: SubstackClientOptions) {
@@ -156,6 +169,7 @@ export class SubstackClient {
     this.publicationApiBase = options.publicationUrl
       ? apiBase(options.publicationUrl, options.urlPrefix)
       : undefined
+    this.sessionToken = sessionToken
     this.sessionCookie = `${options.sessionCookieName ?? DEFAULT_SESSION_COOKIE_NAME}=${sessionToken}`
     this.endpoints = {
       global: <T = unknown>(path: string) => this.global<T>(path),
@@ -228,9 +242,20 @@ export class SubstackClient {
     return getNotes<T>(this.endpoints, options)
   }
 
-  /** Returns scheduled Note drafts for the authenticated account. */
-  getDraftNotes<T = unknown>(options: DraftNotesOptions = {}): Promise<DraftNotesPage<T>> {
+  /**
+   * Returns one page of the authenticated account's Note drafts, both
+   * scheduled and unscheduled. Pass `nextCursor` back as `cursor`.
+   */
+  getDraftNotes<T = DraftNote>(options: DraftNotesOptions = {}): Promise<DraftNotesPage<T>> {
     return getDraftNotes<T>(this.endpoints, options)
+  }
+
+  /**
+   * Follows draft pagination and returns up to `maxItems` drafts. Repeated
+   * cursors and inconsistent pages throw instead of being treated as the end.
+   */
+  getAllDraftNotes<T = DraftNote>(options: AllDraftNotesOptions = {}): Promise<T[]> {
+    return getAllDraftNotes<T>(this.endpoints, options)
   }
 
   getProfileNotes<T extends Record<string, unknown> = NoteFeedItem>(
@@ -264,6 +289,8 @@ export class SubstackClient {
 
   /**
    * Permanently deletes a Note or Note draft owned by the authenticated account.
+   * A scheduled draft keeps its ID when it publishes, so deleting a draft ID
+   * after its trigger time removes the published Note instead.
    * This operation has an irreversible external side effect.
    */
   deleteNote(id: number | string): Promise<unknown> {
@@ -354,39 +381,70 @@ export class SubstackClient {
    * Creates a link attachment for a Note. Pass the returned attachment ID to
    * `publishNote` as an `attachmentIds` entry.
    */
-  createAttachment(request: CreateAttachmentRequest): Promise<unknown> {
-    return createAttachment(this.endpoints, request)
+  createAttachment<T = NoteAttachment>(request: CreateAttachmentRequest): Promise<T> {
+    return createAttachment<T>(this.endpoints, request)
   }
 
-  /** Uploads a data-URL image and returns its Substack media metadata. */
-  uploadImage(image: string): Promise<UploadedImage> {
-    return uploadImage(this.endpoints, image)
+  /**
+   * Uploads an image and returns its Substack media metadata. Accepts a
+   * `data:image/...;base64,...` URL, or binary data with an image content type.
+   */
+  uploadImage(image: string | ImageUploadData, options: UploadImageOptions = {}): Promise<UploadedImage> {
+    return uploadImage(this.endpoints, image, options)
   }
 
   /** Creates a Note image attachment from a previously uploaded image. */
-  createImageAttachment(image: UploadedImage): Promise<unknown> {
-    return createImageAttachment(this.endpoints, image)
+  createImageAttachment<T = NoteAttachment>(image: UploadedImage): Promise<T> {
+    return createImageAttachment<T>(this.endpoints, image)
   }
 
   /**
    * Publishes a Note to the authenticated account's feed.
    * This operation has an irreversible external side effect.
    */
-  publishNote(request: PublishNoteRequest): Promise<unknown> {
-    return publishNote(this.endpoints, request)
+  publishNote<T = PublishNoteResponse>(request: PublishNoteRequest): Promise<T> {
+    return publishNote<T>(this.endpoints, request)
   }
 
   /**
-   * Creates a scheduled Note draft that Substack will publish at triggerAt.
-   * This operation creates server-side content but does not publish immediately.
+   * Creates a Note draft that Substack will publish at `triggerAt`. The
+   * returned `id` is the draft ID used by `updateScheduledNote` and
+   * `deleteNote`, and it stays the Note ID after publication.
    */
-  scheduleNote(request: ScheduleNoteRequest): Promise<unknown> {
-    return scheduleNote(this.endpoints, request)
+  scheduleNote<T = ScheduledNoteResponse>(request: ScheduleNoteRequest): Promise<T> {
+    return scheduleNote<T>(this.endpoints, request)
   }
 
-  /** Updates a scheduled Note draft and its scheduled publication time. */
-  updateScheduledNote(id: number | string, request: UpdateScheduledNoteRequest): Promise<unknown> {
-    return updateScheduledNote(this.endpoints, id, request)
+  /**
+   * Creates an unscheduled Note draft. Publish it later with
+   * `publishNote({ ..., draftCommentId })` or schedule it with
+   * `updateScheduledNote`.
+   */
+  createDraftNote<T = ScheduledNoteResponse>(request: CreateDraftNoteRequest): Promise<T> {
+    return createDraftNote<T>(this.endpoints, request)
+  }
+
+  /**
+   * Replaces a Note draft's body, reply role, attachments, and schedule.
+   * Omitting `attachmentIds` removes every attachment from the draft.
+   */
+  updateScheduledNote<T = ScheduledNoteResponse>(
+    id: number | string,
+    request: UpdateScheduledNoteRequest
+  ): Promise<T> {
+    return updateScheduledNote<T>(this.endpoints, id, request)
+  }
+
+  /**
+   * Removes a draft's schedule and keeps it as an unscheduled draft.
+   * Substack requires the full draft content, so pass the body, reply role,
+   * and every attachment ID that should remain.
+   */
+  unscheduleNote<T = ScheduledNoteResponse>(
+    id: number | string,
+    request: UnscheduleNoteRequest
+  ): Promise<T> {
+    return unscheduleNote<T>(this.endpoints, id, request)
   }
 
   getActivity(filter: ActivityFilter = 'all'): Promise<ActivityFeed> {
@@ -481,11 +539,13 @@ export class SubstackClient {
     const body = await response.text()
 
     if (!response.ok) {
+      const { detail, details } = parseUpstreamError(body, [this.sessionToken])
       throw new SubstackApiError(
         `Substack request failed with ${response.status}.`,
         response.status,
         url,
-        body.slice(0, 500)
+        detail,
+        details
       )
     }
 

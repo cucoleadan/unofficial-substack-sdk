@@ -1,6 +1,6 @@
 {
   "name": "unofficial-substack-sdk",
-  "version": "0.3.16",
+  "version": "0.4.0",
   "description": "Unofficial, portable TypeScript SDK for Substack's web API",
   "type": "module",
   "license": "MIT",

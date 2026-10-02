@@ -1,11 +1,16 @@
-import { SubstackApiError } from '../../core/errors.js'
+import { SubstackApiError, SubstackConfigurationError } from '../../core/errors.js'
 import type { EndpointContext } from '../../core/transport.js'
 import { boundedString, positiveInteger } from '../../core/validation.js'
 import type {
+  AllDraftNotesOptions,
   CreateAttachmentRequest,
+  CreateDraftNoteRequest,
   CursorOptions,
+  DraftNote,
   DraftNotesOptions,
   DraftNotesPage,
+  ImageUploadData,
+  NoteAttachment,
   NoteCommentOptions,
   NoteComment,
   NoteEngagement,
@@ -20,13 +25,23 @@ import type {
   ProfileNotesOptions,
   ProfileNotesPage,
   PublishNoteRequest,
+  PublishNoteResponse,
   ScheduleNoteRequest,
+  ScheduledNoteResponse,
   UploadedImage,
+  UnscheduleNoteRequest,
+  UploadImageOptions,
   UpdateScheduledNoteRequest
 } from '../../core/types.js'
 import { getAuthenticatedProfile } from '../profiles/index.js'
 
 const DEFAULT_TAB_ID = 'for-you'
+const DRAFT_NOTES_PATH = '/feed/drafts'
+const DEFAULT_DRAFT_NOTES_LIMIT = 20
+/** Substack rejects larger draft page sizes with HTTP 400. */
+const MAX_DRAFT_NOTES_LIMIT = 100
+const DEFAULT_MAX_DRAFT_ITEMS = 500
+const MAX_DRAFT_ITEMS = 10_000
 
 function cursorQuery(options?: CursorOptions): string {
   return options?.cursor ? `?cursor=${encodeURIComponent(options.cursor)}` : ''
@@ -66,13 +81,99 @@ export async function getNotes<
   return getProfileNotes<T>(context, profileId, options)
 }
 
-/** Returns scheduled Note drafts for the authenticated account. */
-export function getDraftNotes<T = unknown>(
+function boundedPositiveInteger(value: number | string, name: string, maximum: number): number {
+  const parsed = positiveInteger(value, name)
+  if (parsed > maximum) {
+    throw new SubstackConfigurationError(`${name} must be at most ${maximum.toLocaleString('en-US')}.`)
+  }
+  return parsed
+}
+
+/** Returns one page of scheduled and unscheduled Note drafts. */
+export function getDraftNotes<T = DraftNote>(
   context: EndpointContext,
   options: DraftNotesOptions = {}
 ): Promise<DraftNotesPage<T>> {
-  const limit = positiveInteger(options.limit ?? 20, 'Draft notes limit')
-  return context.global(`/feed/drafts?limit=${limit}`)
+  const limit = boundedPositiveInteger(
+    options.limit ?? DEFAULT_DRAFT_NOTES_LIMIT,
+    'Draft notes limit',
+    MAX_DRAFT_NOTES_LIMIT
+  )
+  const query = new URLSearchParams({ limit: String(limit) })
+  if (options.cursor) {
+    query.set('cursor', options.cursor)
+  }
+  return context.global(`${DRAFT_NOTES_PATH}?${query.toString()}`)
+}
+
+/**
+ * Follows draft-page cursors until Substack reports no further page or
+ * `maxItems` drafts are collected. A repeated cursor, a missing `drafts`
+ * array, or `hasMore: true` without a cursor throws rather than being treated
+ * as the end of the list.
+ */
+export async function getAllDraftNotes<T = DraftNote>(
+  context: EndpointContext,
+  options: AllDraftNotesOptions = {}
+): Promise<T[]> {
+  const maxItems = boundedPositiveInteger(
+    options.maxItems ?? DEFAULT_MAX_DRAFT_ITEMS,
+    'Draft notes maxItems',
+    MAX_DRAFT_ITEMS
+  )
+  const pageSize = boundedPositiveInteger(
+    options.pageSize ?? MAX_DRAFT_NOTES_LIMIT,
+    'Draft notes pageSize',
+    MAX_DRAFT_NOTES_LIMIT
+  )
+  const drafts: T[] = []
+  const seenIds = new Set<string>()
+  const seenCursors = new Set<string>()
+  let cursor: string | undefined
+
+  while (drafts.length < maxItems) {
+    const page = await getDraftNotes<T>(context, {
+      limit: Math.min(pageSize, maxItems - drafts.length),
+      cursor
+    })
+    if (!Array.isArray(page.drafts)) {
+      throw new SubstackApiError(
+        'Substack returned a drafts response without a drafts array.',
+        502,
+        DRAFT_NOTES_PATH
+      )
+    }
+
+    for (const draft of page.drafts) {
+      const id = isRecord(draft) && draft.id !== undefined ? String(draft.id) : undefined
+      if (id !== undefined) {
+        if (seenIds.has(id)) continue
+        seenIds.add(id)
+      }
+      drafts.push(draft)
+      if (drafts.length >= maxItems) break
+    }
+
+    const nextCursor =
+      typeof page.nextCursor === 'string' && page.nextCursor.length > 0 ? page.nextCursor : undefined
+    if (!nextCursor) {
+      if (page.hasMore === true) {
+        throw new SubstackApiError(
+          'Substack reported more drafts without a next cursor.',
+          502,
+          DRAFT_NOTES_PATH
+        )
+      }
+      break
+    }
+    if (seenCursors.has(nextCursor)) {
+      throw new SubstackApiError('Substack repeated a drafts cursor.', 502, DRAFT_NOTES_PATH)
+    }
+    seenCursors.add(nextCursor)
+    cursor = nextCursor
+  }
+
+  return drafts
 }
 
 export function getProfileNotes<
@@ -308,41 +409,112 @@ export function getPostComments<T = unknown>(context: EndpointContext, id: numbe
   return context.publication(`/post/${positiveInteger(id, 'Post ID')}/comments`)
 }
 
-export function createAttachment(context: EndpointContext, request: CreateAttachmentRequest): Promise<unknown> {
-  return context.post('/comment/attachment', request)
+export function createAttachment<T = NoteAttachment>(
+  context: EndpointContext,
+  request: CreateAttachmentRequest
+): Promise<T> {
+  return context.post<T>('/comment/attachment', request)
 }
 
-/** Uploads a data-URL image and returns its Substack media metadata. */
-export function uploadImage(context: EndpointContext, image: string): Promise<UploadedImage> {
-  return context.post('/image', { image })
+const IMAGE_CONTENT_TYPE = /^image\/[a-z0-9][a-z0-9.+-]*$/i
+const BASE64_CHUNK_SIZE = 0x8000
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  for (let offset = 0; offset < bytes.length; offset += BASE64_CHUNK_SIZE) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + BASE64_CHUNK_SIZE))
+  }
+  return btoa(binary)
+}
+
+async function imageDataUrl(image: ImageUploadData, options: UploadImageOptions): Promise<string> {
+  const blob = typeof Blob !== 'undefined' && image instanceof Blob ? image : undefined
+  const contentType = (options.contentType ?? blob?.type ?? '').trim().toLowerCase()
+  if (!IMAGE_CONTENT_TYPE.test(contentType)) {
+    throw new SubstackConfigurationError(
+      'An image upload requires an image/* content type, such as image/png.'
+    )
+  }
+
+  const bytes = blob
+    ? new Uint8Array(await blob.arrayBuffer())
+    : image instanceof Uint8Array
+      ? image
+      : new Uint8Array(image as ArrayBuffer)
+  if (bytes.length === 0) {
+    throw new SubstackConfigurationError('An image upload cannot be empty.')
+  }
+  return `data:${contentType};base64,${bytesToBase64(bytes)}`
+}
+
+/**
+ * Uploads an image and returns its Substack media metadata. A string is sent
+ * unchanged as a data URL; binary data is encoded with its image content type.
+ */
+export async function uploadImage(
+  context: EndpointContext,
+  image: string | ImageUploadData,
+  options: UploadImageOptions = {}
+): Promise<UploadedImage> {
+  const dataUrl = typeof image === 'string' ? image : await imageDataUrl(image, options)
+  return context.post('/image', { image: dataUrl })
 }
 
 /** Creates a Note image attachment from a previously uploaded image. */
-export function createImageAttachment(context: EndpointContext, image: UploadedImage): Promise<unknown> {
-  return createAttachment(context, {
+export function createImageAttachment<T = NoteAttachment>(
+  context: EndpointContext,
+  image: UploadedImage
+): Promise<T> {
+  return createAttachment<T>(context, {
     url: image.url,
     type: 'image',
   })
 }
 
-export function publishNote(context: EndpointContext, request: PublishNoteRequest): Promise<unknown> {
-  return context.post('/comment/feed', request)
+export function publishNote<T = PublishNoteResponse>(
+  context: EndpointContext,
+  request: PublishNoteRequest
+): Promise<T> {
+  return context.post<T>('/comment/feed', request)
 }
 
-/** Creates a scheduled Note draft. The API expects trigger_at in snake_case. */
-export function scheduleNote(context: EndpointContext, request: ScheduleNoteRequest): Promise<unknown> {
+/** Creates a Note draft. The API expects trigger_at in snake_case. */
+export function scheduleNote<T = ScheduledNoteResponse>(
+  context: EndpointContext,
+  request: ScheduleNoteRequest
+): Promise<T> {
   const { triggerAt, ...note } = request
-  return context.post('/comment/draft', { ...note, trigger_at: triggerAt })
+  return context.post<T>('/comment/draft', { ...note, trigger_at: triggerAt })
 }
 
-/** Updates a scheduled Note draft. The API expects trigger_at in snake_case. */
-export function updateScheduledNote(
+/** Creates an unscheduled Note draft (`trigger_at: null`). */
+export function createDraftNote<T = ScheduledNoteResponse>(
+  context: EndpointContext,
+  request: CreateDraftNoteRequest
+): Promise<T> {
+  return context.post<T>('/comment/draft', { ...request, trigger_at: null })
+}
+
+/** Removes a draft's schedule while keeping the draft and its content. */
+export function unscheduleNote<T = ScheduledNoteResponse>(
+  context: EndpointContext,
+  id: number | string,
+  request: UnscheduleNoteRequest
+): Promise<T> {
+  return context.patch<T>(`/feed/comment/${positiveInteger(id, 'Scheduled Note ID')}`, {
+    ...request,
+    trigger_at: null
+  })
+}
+
+/** Updates a Note draft. The API expects trigger_at in snake_case. */
+export function updateScheduledNote<T = ScheduledNoteResponse>(
   context: EndpointContext,
   id: number | string,
   request: UpdateScheduledNoteRequest
-): Promise<unknown> {
+): Promise<T> {
   const { triggerAt, ...note } = request
-  return context.patch(`/feed/comment/${positiveInteger(id, 'Scheduled Note ID')}`, {
+  return context.patch<T>(`/feed/comment/${positiveInteger(id, 'Scheduled Note ID')}`, {
     ...note,
     trigger_at: triggerAt
   })

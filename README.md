@@ -102,7 +102,8 @@ Keep the session token local and out of source control. All MCP tools are read-o
 | `getSubscriberStats()` | Publication subscriber records, tier breakdown, and aggregate count. |
 | `getPaidSubscribers()` | Structured breakdown of paid vs free subscribers, subscription tiers, and pledges. |
 | `getNotes({ cursor, profileId })` | Authenticated profile Notes feed (resolves profile ID automatically if omitted). |
-| `getDraftNotes({ limit })` | Scheduled Note drafts for the authenticated account. Defaults to 20. |
+| `getDraftNotes({ limit, cursor })` | One typed page of scheduled and unscheduled Note drafts. `limit` is 1–100 (default 20). |
+| `getAllDraftNotes({ maxItems, pageSize })` | Follows draft cursors and returns up to `maxItems` drafts (default 500). |
 | `getNote(id)` | Raw, typed Note by ID. |
 | `getNoteWithEngagement(id)` | Raw Note and reply pages plus normalized, fully paginated visible reply totals. |
 | `getComment(id)` | Comment by ID. |
@@ -118,14 +119,18 @@ Keep the session token local and out of source control. All MCP tools are read-o
 | `getFollowing({ profileId })` | Accounts followed by the authenticated account (or explicit profile ID). Resolves profile ID automatically if omitted. |
 | `getSubscriptions({ handle, profileId })` | Publication subscriptions for the authenticated account (or public subscriptions for a handle or profile ID). |
 | `testConnectivity()` | Whether the session can perform a lightweight authenticated API request. |
-| `uploadImage(dataUrl)` | Uploads a base64 data-URL image and returns Substack media metadata. |
-| `createImageAttachment(uploadedImage)` | Creates a Note image attachment from an uploaded image. |
-| `createAttachment(request)` | Creates a link or image attachment for a Note. |
-| `publishNote(request)` | Publishes a Note to the authenticated account's feed. |
-| `scheduleNote(request)` | Creates a Note draft scheduled for publication at `triggerAt`. |
-| `updateScheduledNote(id, request)` | Updates a scheduled Note draft and its publication time. |
+| `uploadImage(image, { contentType })` | Uploads a data-URL string, `Blob`, `ArrayBuffer`, or `Uint8Array` image and returns Substack media metadata. |
+| `createImageAttachment(uploadedImage)` | Creates a Note image attachment from an uploaded image and returns its ID. |
+| `createAttachment(request)` | Creates a link or image attachment for a Note and returns its ID. |
+| `publishNote(request)` | Publishes a Note to the authenticated account's feed and returns it. |
+| `scheduleNote(request)` | Creates a Note draft scheduled for `triggerAt` and returns it. |
+| `createDraftNote(request)` | Creates an unscheduled Note draft and returns it. |
+| `updateScheduledNote(id, request)` | Replaces a draft's body, reply role, attachments, and schedule. |
+| `unscheduleNote(id, request)` | Removes a draft's schedule and keeps it as an unscheduled draft. |
 
-Ordinary endpoint methods, including `getProfileFeed()`, `getProfileReplies()`, `getEmailStats()`, `getPostManagementDetail()`, `getNote()`, `getProfileNotes()`, and `getNoteReplies()`, return upstream JSON unchanged. Explicit convenience methods such as `getPostWithEngagement()`, `getNoteWithEngagement()`, and `getUnreadActivity()` add or normalize data. The package exports `SubstackApiError`, `SubstackConfigurationError`, `apiBase`, `ACTIVITY_FILTERS`, and its public TypeScript types. See [Engagement analytics API](docs/engagement-analytics.md) for the observed response structures and field semantics.
+Ordinary endpoint methods, including `getProfileFeed()`, `getProfileReplies()`, `getEmailStats()`, `getPostManagementDetail()`, `getNote()`, `getProfileNotes()`, and `getNoteReplies()`, return upstream JSON unchanged. Explicit convenience methods such as `getPostWithEngagement()`, `getNoteWithEngagement()`, and `getUnreadActivity()` add or normalize data. The package exports `SubstackApiError`, `SubstackConfigurationError`, `apiBase`, `ACTIVITY_FILTERS`, the Note body helpers (`createNoteBodyJson`, `noteBodyJsonToText`, `normalizeNoteBodyJson`, `markdownToNoteBodyJson`, and `noteBodyJsonToMarkdown`), and its public TypeScript types. See [Engagement analytics API](docs/engagement-analytics.md) for the observed response structures and field semantics.
+
+Failed requests throw `SubstackApiError` with `status`, `url`, and `detail`, which is the upstream response body truncated to 500 characters. When Substack sends an error message, `upstreamMessage` holds it, such as `Please type a shorter comment`, and validation failures also set `issues`. Substack's validation responses repeat the submitted value, so the SDK removes each repeated `value` and redacts the session token. Error details never contain cookies or request bodies. Some messages, such as `Please type a shorter comment`, can be shown to readers; others, such as `trigger_at: Invalid value`, are technical, and some are empty.
 
 ## Authenticated profile feed
 
@@ -307,20 +312,32 @@ remain the consuming app's responsibility.
 
 ## Publishing Notes
 
-`publishNote` creates public content. Its `bodyJson` is passed directly to Substack's ProseMirror-style Notes API. Create a link or image attachment first, then include its returned ID in `attachmentIds`.
+`publishNote` creates public content. Its `bodyJson` is passed directly to Substack's ProseMirror-style Notes API. Create a link or image attachment first, then include its returned ID in `attachmentIds`. The method returns the published comment as a `PublishNoteResponse`, whose `id` is the Note ID.
 
 ```ts
 const attachment = await client.createAttachment({
   url: 'https://example.com/article',
   type: 'link'
-}) as { id: string }
+})
+
+const note = await client.publishNote({
+  bodyJson: createNoteBodyJson('Hello, Substack.'),
+  tabId: 'for-you',
+  surface: 'feed',
+  replyMinimumRole: 'everyone',
+  attachmentIds: [attachment.id]
+})
+const noteId = note.id
+```
+
+To upload and attach an image, pass a `data:image/...;base64,...` string to `uploadImage`, or pass a `Blob`, `ArrayBuffer`, or `Uint8Array` with an image content type. Then pass the upload result to `createImageAttachment`.
+
+```ts
+const image = await client.uploadImage(fileBytes, { contentType: 'image/png' })
+const attachment = await client.createImageAttachment(image)
 
 await client.publishNote({
-  bodyJson: {
-    type: 'doc',
-    attrs: { schemaVersion: 'v1' },
-    content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello, Substack.' }] }]
-  },
+  bodyJson: createNoteBodyJson('Look at this.'),
   tabId: 'for-you',
   surface: 'feed',
   replyMinimumRole: 'everyone',
@@ -328,59 +345,174 @@ await client.publishNote({
 })
 ```
 
-To upload and attach an image, pass the browser's `data:image/...;base64,...` value to `uploadImage`, then pass the upload result to `createImageAttachment`.
+Attachment and image facts observed against Substack:
+
+- A Note can have up to 6 attachments. Images can be combined with one link attachment. Two link attachments, or a seventh attachment, fail with HTTP 400 and an empty error message.
+- `uploadImage` accepted PNG, JPEG, GIF, WebP, AVIF, BMP, TIFF, and SVG. A 22 MB image was accepted; 35 MB failed with HTTP 413 `Your upload is too large.` A data URL that is not `image/*` fails with `Invalid data uri`.
+- Substack does not check that the uploaded bytes are a real image, so validate files in your application.
+- Whether unused attachment IDs expire has not been verified. Create attachments shortly before you use them.
+
+To publish a saved draft immediately, pass its ID as `draftCommentId`. Substack publishes the Note under the draft's ID and removes the draft, as its web composer's **Post** button does.
+
+## Formatting Notes
+
+Note bodies are TipTap/ProseMirror documents. `publishNote`, `scheduleNote`, and `createDraftNote` send `bodyJson` unchanged, and every read method returns Substack's `body_json` unchanged, so formatting, mentions, and links survive in both directions.
+
+Substack Notes support these nodes and marks, which the `NoteRichDocument` type describes:
+
+| Supported | Not supported |
+|---|---|
+| Paragraphs, bulleted and numbered lists (nested), quotes, code blocks | Headings, horizontal rules, images in text |
+| Bold, italic, strikethrough, inline code, links | Underline, custom link text |
+| Mentions of users (`mentionType: "user"`) and publications (`"pub"`) | Hard breaks (stored as paragraph breaks), blank lines |
+
+Substack changes some documents when it stores them. These behaviors were verified by publishing test Notes:
+
+- A space that sits on its own between two formatted words is deleted, so `**bold** *italic*` is stored as **bold***italic*.
+- Link text is replaced by the URL. Link attributes are kept as sent.
+- Hard breaks become paragraph breaks, and empty paragraphs are removed.
+- A document with an unsupported node or mark, such as a heading, is rejected with HTTP 500 and an empty message.
+
+`normalizeNoteBodyJson` rewrites a document into the form Substack stores unchanged, so the Note you read back after publishing equals the document you sent. It moves an isolated space into a neighboring plain, bold, or italic word; it never moves a space into inline code or a link. It also replaces link text with the URL, splits paragraphs at hard breaks, and removes empty paragraphs. For unsupported formatting it throws `SubstackConfigurationError` and names each problem, instead of letting Substack return a 500.
 
 ```ts
-const image = await client.uploadImage('data:image/png;base64,...')
-const attachment = await client.createImageAttachment(image)
+import { normalizeNoteBodyJson } from 'unofficial-substack-sdk'
 
-await client.publishNote({
-  bodyJson: { type: 'doc', attrs: { schemaVersion: 'v1' }, content: [] },
-  tabId: 'for-you',
-  surface: 'feed',
-  replyMinimumRole: 'everyone',
-  attachmentIds: [(attachment as { id: string }).id]
-})
+// For example, the JSON from a TipTap editor's getJSON().
+const bodyJson = normalizeNoteBodyJson(editorJson)
+const note = await client.publishNote({ bodyJson, tabId: 'for-you', surface: 'feed', replyMinimumRole: 'everyone' })
+// note.body_json equals bodyJson.
 ```
+
+### Note Markdown
+
+If your application edits Notes as text, `markdownToNoteBodyJson` and `noteBodyJsonToMarkdown` convert between Note Markdown and Substack's document format without losing formatting, mentions, or links:
+
+````md
+Hi @Example Author, **bold** *italic* ~~strikethrough~~ `code` and https://example.com
+- bulleted item
+  - nested item
+1. numbered item
+> quoted line
+```ts
+const fenced = 'code block'
+```
+````
+
+- Each line is one paragraph; blank lines separate two adjacent lists or quotes and are otherwise ignored.
+- `*italic*` and `_italic_` are equivalent. Bare `http://` and `https://` URLs become links; trailing punctuation is not part of the URL.
+- `@handle` becomes a mention for each person tag you supply, as in `createNoteBodyJson`. Add `mentionType: 'pub'` to a tag to mention a publication.
+- A backslash makes the next character literal: `\*`, `\_`, `\@`, `\-`, `\>`, `1\.`, or `https\://`.
+
+```ts
+import { markdownToNoteBodyJson, noteBodyJsonToMarkdown } from 'unofficial-substack-sdk'
+
+const bodyJson = markdownToNoteBodyJson('Thanks **@Example Author** for https://example.com', [
+  { id: taggedProfileId, label: 'Example Author' }
+])
+
+// Later, edit a draft or published Note as Markdown.
+const editable = noteBodyJsonToMarkdown(draft.body_json)
+if (editable) {
+  const updated = markdownToNoteBodyJson(editedMarkdown, editable.personTags)
+}
+```
+
+`markdownToNoteBodyJson` returns a normalized document, so Substack stores it unchanged. `noteBodyJsonToMarkdown` returns `{ markdown, personTags }`, which converts back to the same document. Mark order and Substack's default link, list, and code-block attributes do not count as differences. It returns `null` when exact conversion is impossible: for unsupported formatting, a list item with two paragraphs, inline code containing a backtick, or one person mentioned with two different labels or URLs. The 5,000-character limit applies to visible text, not to Markdown syntax.
 
 ## Scheduling Notes
 
-`scheduleNote` creates a server-side draft and schedules it for publication. Pass an ISO 8601 timestamp as `triggerAt`; the SDK sends it to Substack as `trigger_at`.
+`scheduleNote` creates a server-side draft and returns it as a `ScheduledNoteResponse`. Its numeric `id` is the draft ID for `updateScheduledNote` and `deleteNote`. Pass an ISO 8601 timestamp as `triggerAt`; the SDK sends it to Substack as `trigger_at`. To save a draft without a schedule, use `createDraftNote`, which takes the same fields without `triggerAt`.
 
 Use `createNoteBodyJson` to turn explicit `@handle` occurrences into Substack person-tag nodes. Each tag needs the person's public Substack user ID, handle, and display name.
 
 ```ts
 const taggedProfileId = Number(process.env.SUBSTACK_PROFILE_ID!)
 
-await client.scheduleNote({
+const draft = await client.scheduleNote({
   bodyJson: createNoteBodyJson('Scheduled note for @exampleauthor', [
     { id: taggedProfileId, handle: 'exampleauthor', label: 'Example Author' }
   ]),
-  tabId: 'subscribed',
+  tabId: 'for-you',
   surface: 'feed',
   replyMinimumRole: 'everyone',
-  triggerAt: '2026-07-18T08:12:00.000Z'
+  attachmentIds: [attachment.id],
+  triggerAt: '2026-11-02T08:15:00.000Z'
 })
+const draftId = draft.id
 ```
+
+Request fields:
+
+- `tabId` and `surface` record where the Note was composed. Substack accepts drafts without them, so `createDraftNote` makes them optional; `scheduleNote` and `publishNote` require them. Use `for-you` and `feed` unless you have a reason to send another context.
+- `replyMinimumRole` is `everyone`, `free_subscriber` (subscribers only), or `paid_subscriber`. Other values fail with HTTP 400. If the field is omitted, Substack stores `null`.
+- `attachmentIds` follows the attachment limits in [Publishing Notes](#publishing-notes).
+
+### Note text
+
+`createNoteBodyJson` turns each non-empty line into one paragraph and drops blank lines. Substack cannot store a blank line: it discards empty paragraphs and turns hard breaks into paragraph breaks. Paragraphs already render with space between them. The SDK limits text to 5,000 characters. Substack accepted 5,001 characters and rejected 20,000 with `Please type a shorter comment`.
+
+`noteBodyJsonToText` reverses `createNoteBodyJson`. It returns `{ text, personTags }` for a document that contains only paragraphs, unformatted text, and user mentions. It returns `null` for links, bold or italic marks, lists, hard breaks, and any other node, so your application can tell when a draft cannot be edited as plain text without losing content. For formatted Notes, use [Note Markdown](#note-markdown) instead.
+
+```ts
+const editable = noteBodyJsonToText(draft.body_json)
+
+if (editable) {
+  // editable.text has one line per paragraph and `@Label` for each mention.
+  const bodyJson = createNoteBodyJson(editedText, editable.personTags)
+}
+```
+
+The round trip is exact: `createNoteBodyJson(text, personTags)` rebuilds the original document. Text that goes from text to a document and back is unchanged, except that blank lines are removed and `\r\n` becomes `\n`.
+
+### Timing, lead time, and cancellation
+
+- `trigger_at` can be at most 92 days ahead. A later time fails with HTTP 400 `trigger_at cannot be more than 92 days in the future`, **but Substack still creates an unscheduled draft**. After this error, find the stray draft with `getDraftNotes` and delete it before you retry.
+- A `trigger_at` that is not a valid date, or one in the past, fails with HTTP 400 (`trigger_at must be in the future`) and creates no draft.
+- There is no minimum lead time: drafts scheduled 30, 60, and 90 seconds ahead were accepted. In one test run, Substack published between 0.1 and 1.8 seconds after `trigger_at`.
+- A published Note keeps its draft ID, so the draft `id` is also the Note `id`.
+- `deleteNote(draftId)` cancels a draft and returns `{}`. Deleting the same ID again fails with HTTP 403 and an empty body.
+- Cancelling worked up to `trigger_at`. In one test run, deletes sent 10 seconds before, 2 seconds before, and exactly at `trigger_at` all stopped the Note. After `trigger_at`, the same `deleteNote(draftId)` call removes the published Note, but it will have been public for those seconds.
+
+For a **Post now** button with an **Abort** option, choose one of these approaches:
+
+- **Schedule it.** Call `scheduleNote` with `triggerAt` set a short time ahead, and call `deleteNote` to abort. Disable **Abort** a second or two before `trigger_at` so an abort never arrives after publication.
+- **Hold it in your application.** Keep the Note in your own queue during the undo window, and call `publishNote` when the window ends. Aborting removes it from your queue, so it can never reach Substack.
+- **Save a draft first.** Create the draft with `createDraftNote`, and call `publishNote({ ..., draftCommentId })` when the window ends. Aborting deletes the draft.
 
 ## Managing scheduled drafts
 
-`getDraftNotes` returns Substack's paged draft response, including each draft's `trigger_at`, attachments, `hasMore`, and `nextCursor` fields.
+`getDraftNotes` returns one typed page of `DraftNote` objects. It includes both scheduled drafts and unscheduled drafts, which have `trigger_at: null`. Each draft has its `id`, `body` (plain text), `body_json`, `trigger_at`, `date`, `edited_at`, `reply_minimum_role`, and `attachments`. Upstream fields without a declared type are retained.
+
+`limit` must be between 1 and 100; the default is 20. To get the next page, pass `nextCursor` as `cursor`. When `nextCursor` is `null`, there are no more pages. A malformed cursor fails with HTTP 400 `Invalid cursor format`.
 
 ```ts
-const drafts = await client.getDraftNotes({ limit: 20 })
+const firstPage = await client.getDraftNotes({ limit: 100 })
+const secondPage = firstPage.nextCursor
+  ? await client.getDraftNotes({ limit: 100, cursor: firstPage.nextCursor })
+  : undefined
+
+const allDrafts = await client.getAllDraftNotes({ maxItems: 1_000 })
+const scheduled = allDrafts.filter((draft) => draft.trigger_at)
 ```
 
-`updateScheduledNote` updates a draft's content, publication time, and optional attachments. It sends `triggerAt` as Substack's `trigger_at` field and forwards attachment IDs from `attachmentIds`.
+`getAllDraftNotes` follows cursors until there are no more pages or it has collected `maxItems` drafts. `maxItems` defaults to 500 and can be up to 10,000. It skips duplicate drafts. It throws `SubstackApiError` instead of returning partial results when Substack repeats a cursor, omits the `drafts` array, or reports `hasMore` without a cursor.
+
+`updateScheduledNote` replaces a draft's body, reply role, attachments, and schedule. Substack replaces the draft's attachments with `attachmentIds`, so **omitting it removes every attachment**; always pass the IDs that should remain. Every update must include `bodyJson`; an update with only `trigger_at` fails with `Please add a comment or an attachment.` To keep a draft but remove its schedule, call `unscheduleNote`. It sends `trigger_at: null` with the draft's content, which is the request Substack's composer sends for **Remove schedule**.
 
 ```ts
-const scheduledNoteId = Number(process.env.SUBSTACK_SCHEDULED_NOTE_ID!)
-
-await client.updateScheduledNote(scheduledNoteId, {
-  bodyJson: { type: 'doc', attrs: { schemaVersion: 'v1' }, content: [] },
+await client.updateScheduledNote(draft.id, {
+  bodyJson: createNoteBodyJson('Updated scheduled note'),
   replyMinimumRole: 'everyone',
-  attachmentIds: ['attachment-or-note-id'],
-  triggerAt: '2026-07-18T08:12:00.000Z'
+  attachmentIds: draft.attachments?.map((attachment) => attachment.id) ?? [],
+  triggerAt: '2026-11-03T09:00:00.000Z'
+})
+
+// Keep the draft but remove its schedule.
+await client.unscheduleNote(draft.id, {
+  bodyJson: draft.body_json,
+  replyMinimumRole: draft.reply_minimum_role ?? 'everyone',
+  attachmentIds: draft.attachments?.map((attachment) => attachment.id) ?? []
 })
 ```
 

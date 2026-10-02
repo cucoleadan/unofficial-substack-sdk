@@ -1224,12 +1224,12 @@ describe('SubstackClient', () => {
       fetch: async (input, init) => {
         const request = new Request(input, init)
         calls.push({ method: request.method, url: request.url, body: await request.json() })
-        return Response.json(calls.length === 1 ? uploadedImage : { id: 'image-attachment-id' })
+        return Response.json(calls.length === 1 ? uploadedImage : { id: 'image-attachment-id', type: 'image' })
       }
     })
 
     await expect(client.uploadImage('data:image/png;base64,aGVsbG8=')).resolves.toEqual(uploadedImage)
-    await expect(client.createImageAttachment(uploadedImage)).resolves.toEqual({ id: 'image-attachment-id' })
+    await expect(client.createImageAttachment(uploadedImage)).resolves.toEqual({ id: 'image-attachment-id', type: 'image' })
     expect(calls).toEqual([
       {
         method: 'POST',
